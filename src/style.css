@@ -1,6 +1,15 @@
 :root {
-  color: #1f3553;
-  background: #f5f8fc;
+  --ink: #0b1220;
+  --navy: #121b2b;
+  --panel: #172234;
+  --line: #2a3a50;
+  --text: #e6edf5;
+  --muted: #9aabc0;
+  --primary: #3d73a8;
+  --mint: #7dcec4;
+  --danger: #e07a7a;
+  color: var(--text);
+  background: var(--navy);
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.45;
   font-weight: 400;
@@ -18,12 +27,15 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100svh;
+  background: var(--navy);
 }
 
 #app {
   min-height: 100svh;
+  background: var(--navy);
 }
 
-button {
+button,
+input {
   font: inherit;
 }
