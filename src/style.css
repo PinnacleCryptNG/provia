@@ -1,0 +1,29 @@
+:root {
+  color: #1f3553;
+  background: #f5f8fc;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.45;
+  font-weight: 400;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100svh;
+}
+
+#app {
+  min-height: 100svh;
+}
+
+button {
+  font: inherit;
+}
