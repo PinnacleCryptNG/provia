@@ -2,10 +2,12 @@
 import { onMounted, ref } from 'vue'
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
 import CreatePayment from './components/CreatePayment.vue'
+import ProofReceipt from './components/ProofReceipt.vue'
 import ReviewPayment from './components/ReviewPayment.vue'
 import VerificationPayment from './components/VerificationPayment.vue'
+import { isIntentId, isProofId } from './lib/ids'
 import {
-  createPaymentIntent,
+  validatePaymentDraft,
   withFailedStatus,
   withRejectedStatus,
   withSubmittedHash,
@@ -19,7 +21,15 @@ import {
   sendBasicNimPayment,
   toUserFacingError,
 } from './lib/nimiq'
-import { createProviaApiVerificationService } from './lib/observation-service'
+import {
+  createProviaApiVerificationService,
+  createServerIntent,
+  createServerProof,
+  fetchServerProof,
+  paymentIntentFromServer,
+  type ProofRecord,
+} from './lib/observation-service'
+import { parseNimToLuna, lunaToSafeNumber } from './lib/amount'
 import {
   observePaymentEvidence,
   stateAfterWalletHash,
@@ -32,18 +42,49 @@ const isInitializing = ref(true)
 const isProviderReady = ref(false)
 const initError = ref<string | null>(null)
 const formErrors = ref<FieldErrors>({})
+const createError = ref<string | null>(null)
 const submitError = ref<string | null>(null)
+const isCreatingIntent = ref(false)
 const isSubmitting = ref(false)
 const screen = ref<Screen>('create')
 const intent = ref<PaymentIntent | null>(null)
 const flowState = ref<VerificationFlowState | null>(null)
+const proof = ref<ProofRecord | null>(null)
+const proofError = ref<string | null>(null)
+const sharedProofMissing = ref(false)
 const createFormKey = ref(0)
 
 let provider: NimiqProvider | null = null
 let observationRun = 0
 const verificationService = createProviaApiVerificationService()
 
+function proofIdFromLocation(): string | null {
+  const value = new URLSearchParams(window.location.search).get('proof')
+  return value && isProofId(value) ? value : null
+}
+
+function clearProofQuery() {
+  const url = new URL(window.location.href)
+  url.searchParams.delete('proof')
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+}
+
 onMounted(async () => {
+  const sharedProofId = proofIdFromLocation()
+  if (sharedProofId) {
+    try {
+      proof.value = await fetchServerProof(sharedProofId)
+      if (!proof.value) {
+        sharedProofMissing.value = true
+        proofError.value = 'This PROVIA verification proof was not found.'
+      }
+    }
+    catch {
+      sharedProofMissing.value = true
+      proofError.value = 'PROVIA could not load this verification proof.'
+    }
+  }
+
   try {
     provider = await initializeNimiqProvider()
     isProviderReady.value = true
@@ -56,17 +97,43 @@ onMounted(async () => {
   }
 })
 
-function reviewPayment(draft: PaymentDraft) {
+async function reviewPayment(draft: PaymentDraft) {
   submitError.value = null
-  const result = createPaymentIntent(draft)
-  if (!result.ok) {
-    formErrors.value = result.errors
+  createError.value = null
+  const errors = validatePaymentDraft(draft)
+  if (errors.recipient || errors.amount) {
+    formErrors.value = errors
+    return
+  }
+
+  const parsedAmount = parseNimToLuna(draft.amount)
+  if (!parsedAmount.ok) {
+    formErrors.value = { amount: parsedAmount.message }
     return
   }
 
   formErrors.value = {}
-  intent.value = result.intent
-  screen.value = 'review'
+  isCreatingIntent.value = true
+
+  try {
+    const created = await createServerIntent({
+      recipient: draft.recipient,
+      amountLuna: lunaToSafeNumber(parsedAmount.luna),
+    })
+    const purpose = draft.purpose.trim()
+    intent.value = paymentIntentFromServer(created, {
+      purpose: purpose.length > 0 ? purpose : null,
+    })
+    screen.value = 'review'
+  }
+  catch (error) {
+    createError.value = error instanceof Error
+      ? error.message
+      : 'PROVIA could not create the payment intent. Try again.'
+  }
+  finally {
+    isCreatingIntent.value = false
+  }
 }
 
 function backToCreate() {
@@ -75,9 +142,30 @@ function backToCreate() {
   screen.value = 'create'
 }
 
+async function issueProofIfVerified() {
+  const current = intent.value
+  if (!current?.transactionHash || !isIntentId(current.id)) {
+    return
+  }
+
+  if (flowState.value?.screen !== 'complete' || flowState.value.result.outcome !== 'VERIFIED') {
+    return
+  }
+
+  try {
+    proof.value = await createServerProof(current.id, current.transactionHash)
+    proofError.value = null
+  }
+  catch (error) {
+    proofError.value = error instanceof Error
+      ? error.message
+      : 'PROVIA could not create a verification proof.'
+  }
+}
+
 async function runObservation() {
   const current = intent.value
-  if (!current?.transactionHash) {
+  if (!current?.transactionHash || !isIntentId(current.id)) {
     return
   }
 
@@ -92,11 +180,15 @@ async function runObservation() {
       flowState.value = state
     },
   })
+
+  if (runId === observationRun) {
+    await issueProofIfVerified()
+  }
 }
 
 async function confirmPayment() {
-  if (!intent.value) {
-    submitError.value = 'No payment intent to confirm.'
+  if (!intent.value || !isIntentId(intent.value.id)) {
+    submitError.value = 'This payment has no server-owned intent ID.'
     return
   }
 
@@ -139,11 +231,16 @@ function retryVerification() {
 function restart() {
   observationRun += 1
   formErrors.value = {}
+  createError.value = null
   submitError.value = null
+  proofError.value = null
+  sharedProofMissing.value = false
   intent.value = null
   flowState.value = null
+  proof.value = null
   createFormKey.value += 1
   screen.value = 'create'
+  clearProofQuery()
 }
 </script>
 
@@ -156,10 +253,22 @@ function restart() {
         Create a NIM payment intent, submit it through Nimiq Pay, then verify it
         against independent blockchain evidence.
       </p>
-      <p v-if="isProviderReady" class="connected">Nimiq Pay connected</p>
+      <p v-if="isProviderReady && !proof" class="connected">Nimiq Pay connected</p>
     </header>
 
-    <p v-if="isInitializing" class="status" role="status">
+    <ProofReceipt
+      v-if="proof"
+      :proof="proof"
+      @restart="restart"
+    />
+
+    <section v-else-if="sharedProofMissing" class="panel" aria-live="polite">
+      <h2>Proof not available</h2>
+      <p class="error">{{ proofError }}</p>
+      <p>Ask the sender to create the payment again, or create a new payment in Nimiq Pay.</p>
+    </section>
+
+    <p v-else-if="isInitializing" class="status" role="status">
       Waiting for Nimiq Pay to initialize the provider...
     </p>
 
@@ -181,6 +290,8 @@ function restart() {
         :key="createFormKey"
         v-show="screen === 'create'"
         :errors="formErrors"
+        :is-creating="isCreatingIntent"
+        :server-error="createError"
         @review="reviewPayment"
       />
       <ReviewPayment
@@ -192,11 +303,12 @@ function restart() {
         @confirm="confirmPayment"
       />
       <VerificationPayment
-        v-if="screen === 'verify' && flowState"
+        v-if="screen === 'verify' && flowState && !proof"
         :state="flowState"
         @retry="retryVerification"
         @restart="restart"
       />
+      <p v-if="proofError && screen === 'verify'" class="error">{{ proofError }}</p>
     </template>
   </main>
 </template>

@@ -4,7 +4,7 @@ PROVIA is a Nimiq Pay Mini App for payment verification.
 
 Thesis: **Intent → Evidence → Verification → Proof**.
 
-A wallet transaction hash is a submission receipt. It is not verification. The Mini App sends the payment **intent** and **transaction hash** to the PROVIA server. The server independently observes the Nimiq chain and runs the shared `verifyPayment()` engine.
+The Mini App creates a **server-owned payment intent**. After Nimiq Pay returns a transaction hash, the Mini App sends only `intentId` and `transactionHash`. The server looks up the stored intent, independently observes the Nimiq chain, and runs the shared `verifyPayment()` engine. A **PROVIA verification proof** is issued only when that engine returns `VERIFIED`.
 
 ```text
 Mini App  →  PROVIA server  →  Nimiq RPC
@@ -34,39 +34,26 @@ Start both together:
 npm run dev
 ```
 
-That is equivalent to:
+Vite proxies `/api` to `http://127.0.0.1:43124`. Open the **Network URL** from Nimiq Pay, for example `http://192.168.1.42:5173`. Do not use localhost on the phone.
 
-```bash
-npm run dev:server
-npm run dev:client -- --host
-```
+## API
 
-Vite is configured with `server.host: true` and proxies `/api` to `http://127.0.0.1:43124`. Copy the **Network URL** from the Vite terminal, for example:
+- `POST /api/intents` — create a server-owned intent (`pi_…`)
+- `GET /api/intents/:intentId` — retrieve the stored intent
+- `POST /api/verify` — `{ intentId, transactionHash }`
+- `POST /api/proofs` — independently verify again; issue a proof only if `VERIFIED`
+- `GET /api/proofs/:proofId` — retrieve a stored proof
+- `GET /health`
 
-```text
-http://192.168.1.42:5173
-```
-
-Do not open `localhost` from the phone. In the phone's WebView, localhost is the phone.
-
-The Mini App calls relative `POST /api/verify`. The phone never talks to `127.0.0.1:43124` and does not need a hardcoded localhost API URL. Vite on this machine forwards `/api` to the verification server, which then calls Nimiq RPC.
-
-Override the RPC endpoint with `NIMIQ_RPC_URL` if you replace the prototype public node. The default is `https://rpc.testnet.nimiqwatch.com`. Clients cannot supply an RPC URL.
+Intents and proofs are in-memory for this prototype. Restarting the server clears them.
 
 ## Load it in Nimiq Pay
 
-1. Open Nimiq Pay.
-2. Long-press Settings for 10 seconds and switch to **Testnet**.
-3. On testnet, use **Get free NIM** if the account is empty.
-4. Go to Mini Apps and enter the Vite Network URL.
-5. Wait until the app shows **Nimiq Pay connected**.
-6. Enter a recipient Nimiq address, a positive NIM amount, and an optional purpose.
-7. Tap **Review payment**. Confirm that the network reads **Nimiq Testnet**.
-8. Tap **Confirm payment** and approve the native Nimiq Pay dialog.
-9. You should see **Payment submitted**, then a short sequence of server verification requests.
-10. The final screen is the server's `verifyPayment()` outcome: verified, mismatch, failed, or not verified yet.
-
-Verification requires 60 confirmations (one Albatross batch). A brand-new testnet payment will usually land as **Payment not verified yet**. Use **Check again** after the transaction has had time to confirm. That is not a failed payment.
+1. Open Nimiq Pay on Testnet.
+2. Enter the Vite Network URL in Mini Apps.
+3. Create a payment. PROVIA stores the intent on the server before review.
+4. Confirm in Nimiq Pay.
+5. PROVIA verifies against the chain. If the payment is verified, it issues a shareable proof receipt.
 
 ## Tests
 
@@ -74,25 +61,8 @@ Verification requires 60 confirmations (one Albatross batch). A brand-new testne
 npm test
 ```
 
-Verifier tests are offline. Server API tests use mocked RPC. The live Testnet observation test in `tests/observe.test.ts` still hits public RPC and is useful as a spike check.
-
 ## Production build
 
 ```bash
 npm run build
 ```
-
-The Mini App build is the Vue client. The verification server is started separately with `npm run dev:server`.
-
-## Network identifiers
-
-Payment intents use an explicit network:
-
-- `NIMIQ_TESTNET` (current default)
-- `NIMIQ_MAINNET`
-
-The generic string `"Nimiq"` is not a network. Observed `networkId` from the chain is the evidence used by verification.
-
-## Observation
-
-The Mini App makes a small number of `POST /api/verify` requests with a pause between attempts, then stops. Each server request performs one RPC lookup. Public Nimiq.watch RPC is rate-limited. Retry is manual.

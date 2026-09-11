@@ -5,6 +5,8 @@ import type { FieldErrors } from '../lib/intent'
 
 defineProps<{
   errors: FieldErrors
+  isCreating?: boolean
+  serverError?: string | null
 }>()
 
 const recipient = ref('')
@@ -72,7 +74,11 @@ function submit() {
       >
     </label>
 
-    <button type="submit">Review payment</button>
+    <p v-if="serverError" class="error" role="alert">{{ serverError }}</p>
+
+    <button type="submit" :disabled="isCreating">
+      {{ isCreating ? 'Creating intent…' : 'Review payment' }}
+    </button>
   </form>
 </template>
 
@@ -147,5 +153,9 @@ button {
   font-weight: 600;
   background: var(--primary);
   color: #f4f8fc;
+}
+
+button:disabled {
+  opacity: 0.55;
 }
 </style>

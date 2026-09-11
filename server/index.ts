@@ -1,12 +1,25 @@
 import http from 'node:http'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { isIntentId, isProofId } from '../src/lib/ids.ts'
+import {
+  createIntentStore,
+  expectedPaymentFromStoredIntent,
+  parseCreateIntentRequest,
+  publicIntent,
+  type IntentStore,
+} from './intents.ts'
 import { createNimiqRpcObserver, type ObserveTransaction } from './observation.ts'
 import {
+  createProofStore,
+  issueProof,
+  type ProofStore,
+} from './proofs.ts'
+import {
+  parseProofRequest,
   parseVerifyRequest,
   toVerifyApiResponse,
   verifyIntentAgainstChain,
-  type VerifyApiResponse,
 } from './verification.ts'
 
 export const DEFAULT_SERVER_PORT = 43124
@@ -16,6 +29,8 @@ const MAX_BODY_BYTES = 32 * 1024
 
 export type ProviaServerOptions = {
   observe?: ObserveTransaction
+  intents?: IntentStore
+  proofs?: ProofStore
   host?: string
   port?: number
 }
@@ -26,14 +41,14 @@ function json(res: http.ServerResponse, status: number, body: unknown): void {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   })
   res.end(payload)
 }
 
 function readBody(req: http.IncomingMessage): Promise<unknown> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolveBody, reject) => {
     const chunks: Buffer[] = []
     let size = 0
 
@@ -49,12 +64,12 @@ function readBody(req: http.IncomingMessage): Promise<unknown> {
 
     req.on('end', () => {
       if (chunks.length === 0) {
-        resolve(null)
+        resolveBody(null)
         return
       }
 
       try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')))
+        resolveBody(JSON.parse(Buffer.concat(chunks).toString('utf8')))
       }
       catch {
         reject(new Error('Request body is not valid JSON.'))
@@ -65,68 +80,199 @@ function readBody(req: http.IncomingMessage): Promise<unknown> {
   })
 }
 
-export function createProviaRequestListener(observe: ObserveTransaction): http.RequestListener {
+function matchNamedId(pathname: string, prefix: string): string | null {
+  if (!pathname.startsWith(prefix)) {
+    return null
+  }
+
+  const id = pathname.slice(prefix.length)
+  if (!id || id.includes('/')) {
+    return null
+  }
+
+  return id
+}
+
+export function createProviaRequestListener(options: {
+  observe: ObserveTransaction
+  intents: IntentStore
+  proofs: ProofStore
+}): http.RequestListener {
+  const { observe, intents, proofs } = options
+
   return async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://provia.local')
+    const { pathname } = url
 
     if (req.method === 'OPTIONS') {
       res.writeHead(204, {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',
       })
       res.end()
       return
     }
 
-    if (req.method === 'GET' && url.pathname === '/health') {
+    if (req.method === 'GET' && pathname === '/health') {
       json(res, 200, { ok: true, service: 'provia-verify' })
       return
     }
 
-    if (url.pathname !== '/api/verify') {
-      json(res, 404, { error: 'Not found.' })
+    if (req.method === 'POST' && pathname === '/api/intents') {
+      let body: unknown
+      try {
+        body = await readBody(req)
+      }
+      catch (error) {
+        json(res, 400, { error: error instanceof Error ? error.message : 'Invalid request body.' })
+        return
+      }
+
+      const parsed = parseCreateIntentRequest(body)
+      if (!parsed.ok) {
+        json(res, 400, { error: parsed.error })
+        return
+      }
+
+      const stored = intents.create(parsed.intent)
+      json(res, 201, {
+        intentId: stored.intentId,
+        intent: publicIntent(stored),
+      })
       return
     }
 
-    if (req.method !== 'POST') {
-      json(res, 405, { error: 'Use POST /api/verify.' })
+    const intentId = matchNamedId(pathname, '/api/intents/')
+    if (req.method === 'GET' && intentId) {
+      if (!isIntentId(intentId)) {
+        json(res, 404, { error: 'Unknown payment intent.' })
+        return
+      }
+
+      const stored = intents.get(intentId)
+      if (!stored) {
+        json(res, 404, { error: 'Unknown payment intent.' })
+        return
+      }
+
+      json(res, 200, {
+        intentId: stored.intentId,
+        intent: publicIntent(stored),
+        createdAt: stored.createdAt,
+      })
       return
     }
 
-    let body: unknown
-    try {
-      body = await readBody(req)
-    }
-    catch (error) {
-      json(res, 400, { error: error instanceof Error ? error.message : 'Invalid request body.' })
+    if (pathname === '/api/verify') {
+      if (req.method !== 'POST') {
+        json(res, 405, { error: 'Use POST /api/verify.' })
+        return
+      }
+
+      let body: unknown
+      try {
+        body = await readBody(req)
+      }
+      catch (error) {
+        json(res, 400, { error: error instanceof Error ? error.message : 'Invalid request body.' })
+        return
+      }
+
+      const parsed = parseVerifyRequest(body)
+      if (!parsed.ok) {
+        json(res, 400, { error: parsed.error })
+        return
+      }
+
+      const stored = intents.get(parsed.intentId)
+      if (!stored) {
+        json(res, 404, { error: 'Unknown payment intent.' })
+        return
+      }
+
+      try {
+        const result = await verifyIntentAgainstChain(
+          expectedPaymentFromStoredIntent(stored),
+          parsed.transactionHash,
+          observe,
+        )
+        json(res, 200, toVerifyApiResponse(stored.intentId, stored.network, result))
+      }
+      catch (error) {
+        json(res, 500, { error: error instanceof Error ? error.message : 'Verification failed.' })
+      }
       return
     }
 
-    const parsed = parseVerifyRequest(body)
-    if (!parsed.ok) {
-      json(res, 400, { error: parsed.error })
+    if (pathname === '/api/proofs' && req.method === 'POST') {
+      let body: unknown
+      try {
+        body = await readBody(req)
+      }
+      catch (error) {
+        json(res, 400, { error: error instanceof Error ? error.message : 'Invalid request body.' })
+        return
+      }
+
+      const parsed = parseProofRequest(body)
+      if (!parsed.ok) {
+        json(res, 400, { error: parsed.error })
+        return
+      }
+
+      try {
+        const issued = await issueProof({
+          intentId: parsed.intentId,
+          transactionHash: parsed.transactionHash,
+          intents,
+          proofs,
+          observe,
+        })
+
+        if (!issued.ok) {
+          json(res, issued.status, {
+            error: issued.error,
+            outcome: issued.result?.outcome ?? null,
+            reason: issued.result?.reason ?? null,
+          })
+          return
+        }
+
+        json(res, 201, issued.proof)
+      }
+      catch (error) {
+        json(res, 500, { error: error instanceof Error ? error.message : 'Proof creation failed.' })
+      }
       return
     }
 
-    try {
-      const result = await verifyIntentAgainstChain(
-        parsed.intent,
-        parsed.transactionHash,
-        observe,
-      )
-      const response: VerifyApiResponse = toVerifyApiResponse(parsed.intent, result)
-      json(res, 200, response)
+    const proofId = matchNamedId(pathname, '/api/proofs/')
+    if (req.method === 'GET' && proofId) {
+      if (!isProofId(proofId)) {
+        json(res, 404, { error: 'Proof not found.' })
+        return
+      }
+
+      const proof = proofs.get(proofId)
+      if (!proof) {
+        json(res, 404, { error: 'Proof not found.' })
+        return
+      }
+
+      json(res, 200, proof)
+      return
     }
-    catch (error) {
-      json(res, 500, { error: error instanceof Error ? error.message : 'Verification failed.' })
-    }
+
+    json(res, 404, { error: 'Not found.' })
   }
 }
 
 export function createProviaServer(options: ProviaServerOptions = {}): http.Server {
   const observe = options.observe ?? createNimiqRpcObserver()
-  return http.createServer(createProviaRequestListener(observe))
+  const intents = options.intents ?? createIntentStore()
+  const proofs = options.proofs ?? createProofStore()
+  return http.createServer(createProviaRequestListener({ observe, intents, proofs }))
 }
 
 export function startProviaServer(options: ProviaServerOptions = {}): http.Server {

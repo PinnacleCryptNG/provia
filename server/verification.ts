@@ -1,20 +1,21 @@
-import { isValidNimiqAddress, normalizeNimiqAddress } from '../src/lib/address.ts'
-import { isNimiqNetwork, type NimiqNetwork } from '../src/lib/network.ts'
+import { isIntentId } from '../src/lib/ids.ts'
 import { normalizeTransactionHash } from '../src/lib/observe.ts'
 import {
   verifyPayment,
   type ExpectedNimPayment,
   type VerificationResult,
 } from '../src/lib/verify.ts'
+import type { NimiqNetwork } from '../src/lib/network.ts'
 import type { ObserveTransaction } from './observation.ts'
 
 export type VerifyApiResponse = VerificationResult & {
+  intentId: string
   network: NimiqNetwork
   explanation: string
 }
 
 export type ParsedVerifyRequest =
-  | { ok: true, intent: ExpectedNimPayment, transactionHash: string }
+  | { ok: true, intentId: string, transactionHash: string }
   | { ok: false, error: string }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -25,58 +26,32 @@ function readString(value: unknown): string | null {
   return typeof value === 'string' ? value : null
 }
 
-function readInteger(value: unknown): number | null {
-  return typeof value === 'number' && Number.isInteger(value) ? value : null
-}
-
-function parseIntent(value: unknown): ExpectedNimPayment | null {
-  if (!isRecord(value)) {
-    return null
-  }
-
-  const recipient = readString(value.recipient)
-  const amountLuna = readInteger(value.amountLuna)
-  const asset = readString(value.asset)
-  const network = readString(value.network)
-
-  if (!recipient || amountLuna === null || amountLuna < 0 || !asset || !network || !isNimiqNetwork(network)) {
-    return null
-  }
-
-  if (!isValidNimiqAddress(recipient)) {
-    return null
-  }
-
-  return {
-    recipient: normalizeNimiqAddress(recipient),
-    amountLuna,
-    asset,
-    network,
-  }
-}
-
 /**
- * Accept only the payment intent and transaction hash.
- * Observed amounts, recipients, confirmations, execution, and "verified"
- * claims from the browser are ignored.
+ * Accept only a server-owned intent ID and a transaction hash.
+ * Client-supplied amount, recipient, network, outcome, and observation
+ * fields are ignored.
  */
 export function parseVerifyRequest(body: unknown): ParsedVerifyRequest {
   if (!isRecord(body)) {
     return { ok: false, error: 'Request body must be a JSON object.' }
   }
 
+  const intentId = readString(body.intentId)
   const transactionHash = readString(body.transactionHash)
-  const intent = parseIntent(body.intent)
+
+  if (!intentId || !isIntentId(intentId)) {
+    return { ok: false, error: 'intentId is required.' }
+  }
 
   if (!transactionHash) {
     return { ok: false, error: 'transactionHash is required.' }
   }
 
-  if (!intent) {
-    return { ok: false, error: 'intent must include a valid recipient, amountLuna, asset, and network.' }
-  }
+  return { ok: true, intentId, transactionHash }
+}
 
-  return { ok: true, intent, transactionHash }
+export function parseProofRequest(body: unknown): ParsedVerifyRequest {
+  return parseVerifyRequest(body)
 }
 
 export function explanationFor(result: VerificationResult): string {
@@ -121,12 +96,14 @@ export function explanationFor(result: VerificationResult): string {
 }
 
 export function toVerifyApiResponse(
-  intent: ExpectedNimPayment,
+  intentId: string,
+  network: NimiqNetwork,
   result: VerificationResult,
 ): VerifyApiResponse {
   return {
     ...result,
-    network: intent.network,
+    intentId,
+    network,
     explanation: explanationFor(result),
   }
 }
