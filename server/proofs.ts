@@ -7,7 +7,7 @@ import {
   type IntentStore,
   type StoredPaymentIntent,
 } from './intents.ts'
-import { verifyIntentAgainstChain } from './verification.ts'
+import { verifyIntentAgainstChain, type HashReservationStore } from './verification.ts'
 
 export type ProofRecord = {
   proofId: string
@@ -89,6 +89,7 @@ export async function issueProof(options: {
   intents: IntentStore
   proofs: ProofStore
   observe: ObserveTransaction
+  reservations: HashReservationStore
 }): Promise<IssueProofResult> {
   const stored = options.intents.get(options.intentId)
   if (!stored) {
@@ -99,6 +100,7 @@ export async function issueProof(options: {
     expectedPaymentFromStoredIntent(stored),
     options.transactionHash,
     options.observe,
+    options.reservations,
   )
 
   const proof = proofFromVerifiedResult(stored, result)

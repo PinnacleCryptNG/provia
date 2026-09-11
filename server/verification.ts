@@ -8,6 +8,56 @@ import {
 import type { NimiqNetwork } from '../src/lib/network.ts'
 import type { ObserveTransaction } from './observation.ts'
 
+export type HashReservationStore = {
+  ownerOf(hash: string): string | null
+  reserve(hash: string, intentId: string): void
+}
+
+export function createHashReservationStore(): HashReservationStore {
+  const owners = new Map<string, string>()
+
+  return {
+    ownerOf(hash) {
+      return owners.get(hash) ?? null
+    },
+    reserve(hash, intentId) {
+      owners.set(hash, intentId)
+    },
+  }
+}
+
+/**
+ * A hash that already verified one intent cannot verify a different intent.
+ * Re-checking the same intent with the same hash remains VERIFIED.
+ */
+export function rejectReplayedVerification(
+  result: VerificationResult,
+  intentId: string,
+  transactionHash: string,
+  reservations: HashReservationStore,
+): VerificationResult {
+  if (result.outcome !== 'VERIFIED') {
+    return result
+  }
+
+  const hash = normalizeTransactionHash(transactionHash) ?? result.transactionHash
+  if (!hash) {
+    return result
+  }
+
+  const owner = reservations.ownerOf(hash)
+  if (owner && owner !== intentId) {
+    return {
+      ...result,
+      outcome: 'MISMATCH',
+      reason: 'REPLAYED_TRANSACTION',
+    }
+  }
+
+  reservations.reserve(hash, intentId)
+  return result
+}
+
 export type VerifyApiResponse = VerificationResult & {
   intentId: string
   network: NimiqNetwork
@@ -116,6 +166,7 @@ export async function verifyIntentAgainstChain(
   intent: ExpectedNimPayment,
   transactionHash: string,
   observe: ObserveTransaction,
+  reservations: HashReservationStore,
 ): Promise<VerificationResult> {
   if (!normalizeTransactionHash(transactionHash)) {
     return verifyPayment(intent, {
@@ -125,5 +176,10 @@ export async function verifyIntentAgainstChain(
   }
 
   const observation = await observe(transactionHash)
-  return verifyPayment(intent, observation)
+  return rejectReplayedVerification(
+    verifyPayment(intent, observation),
+    intent.intentId,
+    transactionHash,
+    reservations,
+  )
 }

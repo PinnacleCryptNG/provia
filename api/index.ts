@@ -7,6 +7,7 @@ import {
 import { createIntentStore } from '../server/intents.ts'
 import { createNimiqRpcObserver } from '../server/observation.ts'
 import { createProofStore } from '../server/proofs.ts'
+import { createHashReservationStore } from '../server/verification.ts'
 
 type VercelIncoming = IncomingMessage & {
   body?: unknown
@@ -141,7 +142,8 @@ export function createVercelApiHandler(options: ProviaServerOptions = {}) {
   const observe = options.observe ?? createNimiqRpcObserver()
   const intents = options.intents ?? createIntentStore()
   const proofs = options.proofs ?? createProofStore()
-  const listener = createProviaRequestListener({ observe, intents, proofs })
+  const reservations = options.reservations ?? createHashReservationStore()
+  const listener = createProviaRequestListener({ observe, intents, proofs, reservations })
 
   return (req: IncomingMessage, res: ServerResponse) => listener(adaptVercelRequest(req), res)
 }

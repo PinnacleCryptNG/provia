@@ -41,6 +41,7 @@ export type MismatchReason =
   | 'WRONG_ASSET'
   | 'OVERPAID'
   | 'UNSUPPORTED_TRANSACTION'
+  | 'REPLAYED_TRANSACTION'
 
 export type UnresolvedReason =
   | 'NOT_FOUND'

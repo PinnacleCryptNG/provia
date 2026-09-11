@@ -16,10 +16,12 @@ import {
   type ProofStore,
 } from './proofs.ts'
 import {
+  createHashReservationStore,
   parseProofRequest,
   parseVerifyRequest,
   toVerifyApiResponse,
   verifyIntentAgainstChain,
+  type HashReservationStore,
 } from './verification.ts'
 
 export const DEFAULT_SERVER_PORT = 43124
@@ -31,6 +33,7 @@ export type ProviaServerOptions = {
   observe?: ObserveTransaction
   intents?: IntentStore
   proofs?: ProofStore
+  reservations?: HashReservationStore
   host?: string
   port?: number
 }
@@ -97,8 +100,9 @@ export function createProviaRequestListener(options: {
   observe: ObserveTransaction
   intents: IntentStore
   proofs: ProofStore
+  reservations: HashReservationStore
 }): http.RequestListener {
-  const { observe, intents, proofs } = options
+  const { observe, intents, proofs, reservations } = options
 
   return async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://provia.local')
@@ -196,6 +200,7 @@ export function createProviaRequestListener(options: {
           expectedPaymentFromStoredIntent(stored),
           parsed.transactionHash,
           observe,
+          reservations,
         )
         json(res, 200, toVerifyApiResponse(stored.intentId, stored.network, result))
       }
@@ -228,6 +233,7 @@ export function createProviaRequestListener(options: {
           intents,
           proofs,
           observe,
+          reservations,
         })
 
         if (!issued.ok) {
@@ -272,7 +278,8 @@ export function createProviaServer(options: ProviaServerOptions = {}): http.Serv
   const observe = options.observe ?? createNimiqRpcObserver()
   const intents = options.intents ?? createIntentStore()
   const proofs = options.proofs ?? createProofStore()
-  return http.createServer(createProviaRequestListener({ observe, intents, proofs }))
+  const reservations = options.reservations ?? createHashReservationStore()
+  return http.createServer(createProviaRequestListener({ observe, intents, proofs, reservations }))
 }
 
 export function startProviaServer(options: ProviaServerOptions = {}): http.Server {

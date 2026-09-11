@@ -35,10 +35,21 @@ describe('on-chain PROVIA payment data', () => {
     )
     assert.equal(recipientDataMatchesIntent('', INTENT_ID), false)
     assert.equal(recipientDataMatchesIntent('505', INTENT_ID), false)
+    assert.equal(recipientDataMatchesIntent('PROVIA:', INTENT_ID), false)
+    assert.equal(recipientDataMatchesIntent('PROVIA', INTENT_ID), false)
+    assert.equal(recipientDataMatchesIntent('deadbeef', INTENT_ID), false)
+    assert.equal(recipientDataMatchesIntent('80', INTENT_ID), false)
   })
 
-  it('returns empty string for empty data and null for malformed hex', () => {
+  it('returns empty string for empty data and null for malformed encodings', () => {
     assert.equal(decodeOnChainData(''), '')
     assert.equal(decodeOnChainData('505'), null)
+    assert.equal(decodeOnChainData('80'), null)
+  })
+
+  it('does not use prefix or substring matching for a longer payload', () => {
+    const prefixed = Buffer.from(`PROVIA:${INTENT_ID}andmore`, 'utf8').toString('hex')
+    assert.equal(recipientDataMatchesIntent(prefixed, INTENT_ID), false)
+    assert.equal(decodeOnChainData(prefixed)?.startsWith(`PROVIA:${INTENT_ID}`), true)
   })
 })
