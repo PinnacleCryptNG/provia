@@ -4,6 +4,8 @@ import { describe, it } from 'node:test'
 
 const PRODUCTION_UI_FILES = [
   'src/App.vue',
+  'src/components/AppHeader.vue',
+  'src/components/HomeLanding.vue',
   'src/components/CreatePayment.vue',
   'src/components/ReviewPayment.vue',
   'src/components/VerificationPayment.vue',
@@ -39,6 +41,17 @@ describe('production UI copy', () => {
       }
     })
   }
+
+  it('keeps purpose as an optional dropdown in Create Payment', () => {
+    const source = readFileSync(new URL('../src/components/CreatePayment.vue', import.meta.url), 'utf8')
+    assert.match(source, /<select v-model="purpose"/)
+    assert.match(source, /Select a purpose/)
+    assert.match(source, /Invoice/)
+    assert.match(source, /Gift/)
+    assert.match(source, /Utilities/)
+    assert.match(source, /Friends & Family/)
+    assert.doesNotMatch(source, /type="text"\s+name="purpose"/)
+  })
 
   it('gates the send diagnostic panel behind development mode', () => {
     const appSource = readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8')

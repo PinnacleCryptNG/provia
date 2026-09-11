@@ -1,22 +1,24 @@
 :root {
-  --ink: #0a1524;
-  --navy: #0e1726;
-  --panel: #152235;
-  --record: #101c2e;
-  --line: #2b3d55;
-  --text: #e8eef6;
-  --muted: #8fa3bb;
-  --primary: #3d86c4;
-  --verified: #3ecf9f;
-  --waiting: #e0b44f;
-  --mismatch: #e09a4a;
-  --danger: #e06b6b;
-  --submitted: #7aa7cc;
+  --bg: #eef4fb;
+  --bg-accent: #dceaf8;
+  --surface: #ffffff;
+  --surface-soft: #f7fbff;
+  --text: #1b2a3d;
+  --muted: #5d738c;
+  --line: #d5e3f0;
+  --primary: #0582ca;
+  --primary-strong: #046ba8;
+  --verified: #1aa36a;
+  --waiting: #c48a12;
+  --mismatch: #d07a2f;
+  --danger: #d04b4b;
+  --submitted: #3d8ec9;
+  --shadow: 0 12px 32px rgb(27 58 99 / 8%);
   color: var(--text);
-  background: var(--navy);
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  font-family: Mulish, 'Segoe UI', system-ui, sans-serif;
   line-height: 1.45;
-  font-weight: 400;
+  font-weight: 600;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
@@ -33,8 +35,8 @@ body {
   min-height: 100svh;
   overflow-x: hidden;
   background:
-    radial-gradient(circle at top, #17304a 0%, transparent 42%),
-    var(--navy);
+    radial-gradient(circle at top, rgb(5 130 202 / 14%), transparent 42%),
+    var(--bg);
 }
 
 #app {
@@ -43,33 +45,35 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
 .panel,
 .receipt {
-  padding: 1.15rem 1rem 1.25rem;
-  border-radius: 1rem;
-  background: var(--panel);
-  border: 1px solid var(--line);
+  padding: 1.25rem 1.05rem 1.35rem;
+  border-radius: 1.25rem;
+  background: var(--surface);
+  border: 1px solid rgb(213 227 240 / 90%);
+  box-shadow: var(--shadow);
 }
 
 button.primary,
 button.secondary {
   width: 100%;
-  min-height: 44px;
-  margin-top: 0.5rem;
-  border-radius: 0.7rem;
-  padding: 0.625rem 0.875rem;
-  font-weight: 650;
+  min-height: 48px;
+  margin-top: 0.55rem;
+  border-radius: 0.9rem;
+  padding: 0.7rem 0.9rem;
+  font-weight: 800;
   cursor: pointer;
 }
 
 button.primary {
   border: none;
   background: var(--primary);
-  color: #f4f8fc;
+  color: #fff;
 }
 
 button.secondary {
@@ -79,11 +83,11 @@ button.secondary {
 }
 
 button.primary:hover:not(:disabled) {
-  filter: brightness(1.06);
+  background: var(--primary-strong);
 }
 
 button.secondary:hover:not(:disabled) {
-  background: rgb(232 238 246 / 6%);
+  background: var(--surface-soft);
 }
 
 button:disabled {

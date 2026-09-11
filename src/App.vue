@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
+import AppHeader from './components/AppHeader.vue'
 import CreatePayment from './components/CreatePayment.vue'
+import HomeLanding from './components/HomeLanding.vue'
 import JourneySteps from './components/JourneySteps.vue'
 import ProofReceipt from './components/ProofReceipt.vue'
 import ReviewPayment from './components/ReviewPayment.vue'
 import VerificationPayment from './components/VerificationPayment.vue'
+import { shortenNimiqAddress } from './lib/address'
 import { isIntentId, isProofId } from './lib/ids'
 import {
   validatePaymentDraft,
@@ -19,6 +22,7 @@ import {
 import {
   initializeNimiqProvider,
   isUserRejection,
+  listNimiqAccounts,
   sendBasicNimPayment,
   toProviderConnectionError,
   toUserFacingError,
@@ -33,6 +37,7 @@ import {
   type ProofRecord,
 } from './lib/observation-service'
 import { parseNimToLuna, lunaToSafeNumber } from './lib/amount'
+import { DEFAULT_NIMIQ_NETWORK, nimiqNetworkLabel } from './lib/network'
 import {
   DEFAULT_OBSERVATION_DELAY_MS,
   observePaymentEvidence,
@@ -40,21 +45,22 @@ import {
   type VerificationFlowState,
 } from './lib/verification-flow'
 
-type Screen = 'create' | 'review' | 'verify'
+type Screen = 'home' | 'create' | 'review' | 'verify'
 type JourneyStep = 'create' | 'review' | 'submitted' | 'observing' | 'verdict'
 
 const SUBMITTED_DWELL_MS = 1_200
 const LIVE_MAX_OBSERVATION_ATTEMPTS = 18
 
-const isInitializing = ref(true)
+const isConnectingWallet = ref(true)
 const isProviderReady = ref(false)
 const initError = ref<string | null>(null)
+const accountLabel = ref<string | null>(null)
 const formErrors = ref<FieldErrors>({})
 const createError = ref<string | null>(null)
 const submitError = ref<string | null>(null)
 const isCreatingIntent = ref(false)
 const isSubmitting = ref(false)
-const screen = ref<Screen>('create')
+const screen = ref<Screen>('home')
 const intent = ref<PaymentIntent | null>(null)
 const flowState = ref<VerificationFlowState | null>(null)
 const proof = ref<ProofRecord | null>(null)
@@ -71,8 +77,10 @@ let provider: NimiqProvider | null = null
 let observationRun = 0
 const verificationService = createProviaApiVerificationService()
 
+const networkLabel = nimiqNetworkLabel(DEFAULT_NIMIQ_NETWORK)
+
 const showPaymentFlow = computed(() => {
-  return !isInitializing.value && !proof.value && !sharedProofMissing.value
+  return !proof.value && !sharedProofMissing.value
 })
 
 const journeyStep = computed<JourneyStep>(() => {
@@ -108,6 +116,32 @@ function clearProofQuery() {
   window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
 }
 
+async function connectWallet() {
+  isConnectingWallet.value = true
+  initError.value = null
+
+  try {
+    provider = await initializeNimiqProvider()
+    isProviderReady.value = true
+    try {
+      const accounts = await listNimiqAccounts(provider)
+      accountLabel.value = accounts[0] ? shortenNimiqAddress(accounts[0]) : 'Connected'
+    }
+    catch {
+      accountLabel.value = 'Connected'
+    }
+  }
+  catch (error) {
+    provider = null
+    isProviderReady.value = false
+    accountLabel.value = null
+    initError.value = toProviderConnectionError(error)
+  }
+  finally {
+    isConnectingWallet.value = false
+  }
+}
+
 onMounted(async () => {
   const sharedProofId = proofIdFromLocation()
   if (sharedProofId) {
@@ -124,16 +158,7 @@ onMounted(async () => {
     }
   }
 
-  try {
-    provider = await initializeNimiqProvider()
-    isProviderReady.value = true
-  }
-  catch (error) {
-    initError.value = toProviderConnectionError(error)
-  }
-  finally {
-    isInitializing.value = false
-  }
+  await connectWallet()
 })
 
 async function reviewPayment(draft: PaymentDraft) {
@@ -286,38 +311,20 @@ function restart() {
   proof.value = null
   createFormKey.value += 1
   sendDiagnostic.value = null
-  screen.value = 'create'
+  screen.value = 'home'
   clearProofQuery()
 }
 </script>
 
 <template>
   <main class="app">
-    <header>
-      <div class="brand">
-        <span class="mark" aria-hidden="true" />
-        <div>
-          <h1>PROVIA</h1>
-          <p class="tagline">Independent payment verification</p>
-        </div>
-      </div>
-      <p v-if="showPaymentFlow && screen === 'create'" class="lede">
-        A successful wallet submission is not proof of payment. PROVIA checks the Nimiq blockchain independently.
-      </p>
-      <p v-if="isProviderReady && showPaymentFlow" class="connected">Nimiq Pay connected</p>
-    </header>
-
-    <section
-      v-if="isInitializing && !proof && !sharedProofMissing"
-      class="panel connecting"
-      role="status"
-    >
-      <p class="checking">
-        <span class="pulse" aria-hidden="true" />
-        Connecting to Nimiq Pay
-      </p>
-      <p>Nimiq Pay is required to securely submit the payment. PROVIA will not treat a wallet confirmation as verification.</p>
-    </section>
+    <AppHeader
+      :network-label="networkLabel"
+      :is-connecting="isConnectingWallet"
+      :is-connected="isProviderReady"
+      :account-label="accountLabel"
+      @connect="connectWallet"
+    />
 
     <ProofReceipt
       v-if="proof"
@@ -329,16 +336,23 @@ function restart() {
       <h2>Record not available</h2>
       <p class="error">{{ proofError }}</p>
       <p>Verification records are kept for this session only.</p>
-      <button type="button" class="primary" @click="restart">Create a payment</button>
+      <button type="button" class="primary" @click="restart">Request a payment</button>
     </section>
 
     <template v-if="showPaymentFlow">
-      <section v-if="!isProviderReady" class="banner" role="alert">
+      <section v-if="!isProviderReady && !isConnectingWallet && screen !== 'home'" class="banner" role="alert">
         <p>{{ initError ?? 'Open this Mini App inside Nimiq Pay. A browser window cannot submit a payment.' }}</p>
       </section>
 
-      <JourneySteps :current="journeyStep" />
+      <JourneySteps
+        v-if="screen !== 'home'"
+        :current="journeyStep"
+      />
 
+      <HomeLanding
+        v-if="screen === 'home'"
+        @start="screen = 'create'"
+      />
       <CreatePayment
         :key="createFormKey"
         v-show="screen === 'create'"
@@ -376,107 +390,20 @@ function restart() {
   max-width: 26.5rem;
   width: 100%;
   margin: 0 auto;
-  padding: 1.15rem 1rem 2.5rem;
+  padding: 1.1rem 1rem 2.6rem;
   overflow-wrap: anywhere;
-}
-
-header {
-  margin-bottom: 1.1rem;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-}
-
-.mark {
-  width: 2.15rem;
-  height: 2.15rem;
-  flex: 0 0 auto;
-  border: 1.5px solid var(--verified);
-  border-radius: 0.7rem;
-  background:
-    linear-gradient(180deg, rgb(62 207 159 / 16%), transparent),
-    var(--ink);
-}
-
-.mark::after {
-  content: '';
-  display: block;
-  width: 0.95rem;
-  height: 0.45rem;
-  margin: 0.72rem auto 0;
-  border-left: 2px solid var(--verified);
-  border-bottom: 2px solid var(--verified);
-  transform: rotate(-45deg);
-}
-
-h1 {
-  margin: 0;
-  font-size: 1.45rem;
-  letter-spacing: 0.08em;
-  line-height: 1.1;
-}
-
-.tagline {
-  margin: 0.2rem 0 0;
-  font-size: 0.82rem;
-  font-weight: 650;
-  color: var(--muted);
-}
-
-.lede {
-  margin: 0 0 0.75rem;
-  color: var(--muted);
-}
-
-.connected {
-  display: inline-block;
-  margin: 0;
-  color: var(--verified);
-  font-size: 0.82rem;
-  font-weight: 650;
-}
-
-.connecting p,
-.banner p {
-  margin: 0 0 0.75rem;
-}
-
-.connecting p:last-child,
-.banner p:last-child {
-  margin-bottom: 0;
-}
-
-.checking {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  font-weight: 650;
-}
-
-.pulse {
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 999px;
-  background: var(--submitted);
-  animation: pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%,
-  100% { opacity: 0.35; }
-  50% { opacity: 1; }
 }
 
 .banner {
   margin: 0 0 1rem;
   padding: 0.9rem 0.95rem;
-  border-radius: 0.85rem;
-  border: 1px solid rgb(224 180 79 / 35%);
-  background: rgb(224 180 79 / 10%);
+  border-radius: 0.95rem;
+  border: 1px solid rgb(196 138 18 / 28%);
+  background: rgb(196 138 18 / 10%);
+}
+
+.banner p {
+  margin: 0;
 }
 
 .error {
@@ -485,6 +412,7 @@ h1 {
 
 h2 {
   margin: 0 0 0.5rem;
-  font-size: 1.15rem;
+  font-size: 1.2rem;
+  font-weight: 800;
 }
 </style>

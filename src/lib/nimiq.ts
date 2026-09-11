@@ -9,7 +9,10 @@ let providerPromise: ReturnType<typeof init> | null = null
 
 export function initializeNimiqProvider(): Promise<NimiqProvider> {
   if (!providerPromise) {
-    providerPromise = init({ timeout: INIT_TIMEOUT_MS })
+    providerPromise = init({ timeout: INIT_TIMEOUT_MS }).catch((error) => {
+      providerPromise = null
+      throw error
+    })
   }
 
   return providerPromise

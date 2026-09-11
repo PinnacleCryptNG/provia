@@ -114,15 +114,15 @@ describe('verification UI orchestration', () => {
     assert.equal(view.title, 'Payment submitted')
     assert.equal(
       view.message,
-      'Nimiq Pay accepted the transaction. PROVIA has not verified it yet.',
+      'Your payment was accepted by Nimiq Pay. PROVIA is now checking the blockchain.',
     )
+    assert.equal(view.note, 'Verification is still in progress.')
     assert.equal(view.showVerifiedLabel, false)
     assert.equal(view.kind, 'submitted')
     assert.equal(view.tone, 'neutral')
     assert.ok(view.rows.some((row) => row.label === 'Transaction'))
-    assert.ok(view.rows.some((row) => row.label === 'Amount'))
-    assert.ok(view.rows.some((row) => row.label === 'Recipient'))
-    assert.ok(view.rows.some((row) => row.label === 'Network'))
+    assert.ok(view.summaryRows.some((row) => row.label === 'Recipient'))
+    assert.ok(view.summaryRows.some((row) => row.label === 'Network'))
   })
 
   it('shows observing copy while looking up independent evidence', () => {
@@ -134,9 +134,9 @@ describe('verification UI orchestration', () => {
     })
 
     assert.equal(view.kind, 'checking')
-    assert.equal(view.title, 'Observing the blockchain')
-    assert.equal(view.eyebrow, 'Observing')
-    assert.match(view.message, /independently observing the Nimiq blockchain/)
+    assert.equal(view.title, 'Verifying payment')
+    assert.equal(view.eyebrow, 'Verifying')
+    assert.match(view.message, /independently checking the Nimiq blockchain/)
     assert.equal(view.showVerifiedLabel, false)
     assert.ok(view.rows.some((row) => row.label === 'Network'))
   })
@@ -152,7 +152,7 @@ describe('verification UI orchestration', () => {
 
     assert.equal(result.outcome, 'UNRESOLVED')
     assert.equal(result.reason, 'NOT_FOUND')
-    assert.equal(view.title, 'Transaction not found yet')
+    assert.equal(view.title, 'Looking for the payment')
     assert.equal(view.kind, 'unresolved')
     assert.equal(view.showVerifiedLabel, false)
     assert.equal(view.canRetry, true)
@@ -174,7 +174,7 @@ describe('verification UI orchestration', () => {
     assert.equal(result.outcome, 'UNRESOLVED')
     assert.equal(result.reason, 'INSUFFICIENT_CONFIRMATIONS')
     assert.equal(view.kind, 'waiting')
-    assert.equal(view.title, 'Waiting for confirmations')
+    assert.equal(view.title, 'Verifying payment')
     assert.equal(view.tone, 'waiting')
     assert.equal(view.showVerifiedLabel, false)
     assert.match(view.message, /enough blockchain confirmations/)
@@ -197,7 +197,7 @@ describe('verification UI orchestration', () => {
     assert.equal(view.kind, 'verified')
     assert.equal(view.title, 'Payment verified')
     assert.equal(view.showVerifiedLabel, true)
-    assert.match(view.message, /independently observed blockchain data/)
+    assert.match(view.message, /independently verified on the Nimiq blockchain/)
     assert.match(view.note ?? '', /not a cryptographic certificate/)
     assert.ok(view.rows.some((row) => row.label === 'Amount'))
     assert.ok(view.rows.some((row) => row.label === 'Recipient'))
@@ -223,7 +223,6 @@ describe('verification UI orchestration', () => {
     assert.equal(view.kind, 'wrong_recipient')
     assert.equal(view.title, 'Payment not verified')
     assert.equal(view.message, 'The observed transaction does not satisfy this payment request.')
-    assert.match(view.note ?? '', /different address/)
     assert.equal(view.showVerifiedLabel, false)
     assert.equal(verification.calls.length, 1)
   })
@@ -241,10 +240,6 @@ describe('verification UI orchestration', () => {
     assert.equal(view.kind, 'underpaid')
     assert.equal(view.title, 'Payment not verified')
     assert.equal(view.message, 'The observed transaction does not satisfy this payment request.')
-    assert.equal(
-      view.note,
-      'The amount observed on chain is less than the requested amount.',
-    )
     assert.ok(view.rows.some((row) => row.label === 'Expected'))
     assert.ok(view.rows.some((row) => row.label === 'Observed'))
     assert.equal(view.showVerifiedLabel, false)
@@ -264,7 +259,6 @@ describe('verification UI orchestration', () => {
     assert.equal(view.kind, 'overpaid')
     assert.equal(view.title, 'Payment not verified')
     assert.equal(view.message, 'The observed transaction does not satisfy this payment request.')
-    assert.match(view.note ?? '', /greater than the requested amount/)
     assert.equal(view.tone, 'mismatch')
     assert.equal(view.showVerifiedLabel, false)
   })
@@ -281,9 +275,9 @@ describe('verification UI orchestration', () => {
     assert.equal(result.outcome, 'FAILED')
     assert.equal(result.reason, 'EXECUTION_FAILED')
     assert.equal(view.kind, 'failed')
-    assert.equal(view.title, 'Payment failed')
+    assert.equal(view.title, 'Payment not verified')
     assert.equal(view.tone, 'negative')
-    assert.match(view.message, /execution failed/)
+    assert.equal(view.message, 'The observed transaction does not satisfy this payment request.')
     assert.equal(view.showVerifiedLabel, false)
     assert.equal(verification.calls.length, 1)
   })
@@ -300,7 +294,7 @@ describe('verification UI orchestration', () => {
     assert.equal(result.outcome, 'UNRESOLVED')
     assert.equal(result.reason, 'RPC_ERROR')
     assert.equal(view.kind, 'unresolved')
-    assert.equal(view.title, 'Could not retrieve evidence')
+    assert.equal(view.title, 'Could not check yet')
     assert.notEqual(view.title, 'Payment failed')
     assert.match(view.message, /does not mean the payment failed/)
   })

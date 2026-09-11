@@ -82,8 +82,8 @@ li[data-status='done'] .dot {
 }
 
 li[data-status='current'] .dot {
-  background: var(--verified);
-  box-shadow: 0 0 0 4px rgb(62 207 159 / 16%);
+  background: var(--primary);
+  box-shadow: 0 0 0 4px rgb(5 130 202 / 16%);
 }
 
 li[data-status='current'] .label {

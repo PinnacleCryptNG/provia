@@ -16,16 +16,12 @@ const emit = defineEmits<{
 
 <template>
   <section class="panel">
-    <h2>Review your payment</h2>
-    <p class="hint">You are about to approve this payment in Nimiq Pay.</p>
+    <h2>Review payment</h2>
+    <p class="amount">{{ intent.amountNim }} NIM</p>
 
     <dl>
       <div>
-        <dt>Amount</dt>
-        <dd>{{ intent.amountNim }} NIM</dd>
-      </div>
-      <div>
-        <dt>Recipient</dt>
+        <dt>To</dt>
         <dd class="address">{{ intent.recipient }}</dd>
       </div>
       <div>
@@ -39,13 +35,7 @@ const emit = defineEmits<{
     </dl>
 
     <p class="notice">
-      PROVIA will independently verify this payment on the Nimiq blockchain after it is submitted.
-      Verification requires 60 confirmations.
-    </p>
-
-    <p class="notice binding">
-      <strong>On-chain payment binding.</strong>
-      PROVIA attaches a unique payment identifier to the transaction. The identifier is independently checked against the payment request on the Nimiq blockchain.
+      After you approve the payment in Nimiq Pay, PROVIA will independently verify it on the Nimiq blockchain.
     </p>
 
     <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
@@ -71,13 +61,18 @@ const emit = defineEmits<{
 
 <style scoped>
 h2 {
-  margin: 0 0 0.4rem;
-  font-size: 1.15rem;
+  margin: 0 0 0.85rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--muted);
 }
 
-.hint {
+.amount {
   margin: 0 0 1rem;
-  color: var(--muted);
+  font-size: clamp(2rem, 8vw, 2.6rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
 dl {
@@ -85,14 +80,14 @@ dl {
 }
 
 dl div {
-  padding: 0.8rem 0;
+  padding: 0.75rem 0;
   border-bottom: 1px solid var(--line);
 }
 
 dt {
-  margin: 0 0 0.3rem;
+  margin: 0 0 0.25rem;
   font-size: 0.75rem;
-  font-weight: 650;
+  font-weight: 800;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -100,36 +95,24 @@ dt {
 
 dd {
   margin: 0;
-  font-size: 1.08rem;
+  font-size: 1.05rem;
+  font-weight: 700;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .address {
   font-size: 0.95rem;
-  letter-spacing: 0.01em;
 }
 
 .notice {
   margin: 0 0 1rem;
-  padding: 0.85rem 0.9rem;
-  border-radius: 0.75rem;
-  background: rgb(224 180 79 / 10%);
+  padding: 0.9rem 0.95rem;
+  border-radius: 0.95rem;
+  background: rgb(5 130 202 / 8%);
   color: var(--text);
-  font-size: 0.92rem;
-}
-
-.notice.binding {
-  background: rgb(61 134 196 / 12%);
-}
-
-.notice.binding strong {
-  display: block;
-  margin-bottom: 0.3rem;
-  font-size: 0.8rem;
-  font-weight: 750;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
 .error {

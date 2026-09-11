@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-
+import { PAYMENT_PURPOSES } from '../lib/purpose'
 import type { FieldErrors } from '../lib/intent'
 import { DEFAULT_NIMIQ_NETWORK, nimiqNetworkLabel } from '../lib/network'
+import { ref } from 'vue'
 
 defineProps<{
   errors: FieldErrors
@@ -29,8 +29,25 @@ function submit() {
 
 <template>
   <form class="panel" @submit.prevent="submit">
-    <h2>Create payment</h2>
-    <p class="hint">Enter the NIM payment you want PROVIA to verify. Nothing is sent until you approve it in Nimiq Pay.</p>
+    <h2>Request a payment</h2>
+    <p class="hint">Nothing is sent until you approve it in Nimiq Pay.</p>
+
+    <label>
+      Amount
+      <span class="amount-field">
+        <input
+          v-model="amount"
+          type="text"
+          name="amount"
+          inputmode="decimal"
+          autocomplete="off"
+          placeholder="1.00"
+          :aria-invalid="Boolean(errors.amount)"
+        >
+        <span class="suffix">NIM</span>
+      </span>
+    </label>
+    <p v-if="errors.amount" class="error" role="alert">{{ errors.amount }}</p>
 
     <label>
       Recipient
@@ -48,84 +65,103 @@ function submit() {
     <p v-if="errors.recipient" class="error" role="alert">{{ errors.recipient }}</p>
 
     <label>
-      Amount
-      <input
-        v-model="amount"
-        type="text"
-        name="amount"
-        inputmode="decimal"
-        autocomplete="off"
-        placeholder="0.00"
-        :aria-invalid="Boolean(errors.amount)"
-      >
+      Purpose
+      <span class="optional">Optional</span>
+      <select v-model="purpose" name="purpose">
+        <option value="">Select a purpose</option>
+        <option v-for="option in PAYMENT_PURPOSES" :key="option" :value="option">
+          {{ option }}
+        </option>
+      </select>
     </label>
-    <p v-if="errors.amount" class="error" role="alert">{{ errors.amount }}</p>
 
     <p class="network">
       <span>Network</span>
       <strong>{{ nimiqNetworkLabel(DEFAULT_NIMIQ_NETWORK) }}</strong>
     </p>
 
-    <label>
-      Purpose
-      <span class="optional">Optional</span>
-      <input
-        v-model="purpose"
-        type="text"
-        name="purpose"
-        maxlength="140"
-        autocomplete="off"
-        placeholder="Invoice, rent, or a short note"
-      >
-    </label>
-
     <p v-if="serverError" class="error" role="alert">{{ serverError }}</p>
 
     <button type="submit" class="primary" :disabled="isCreating">
-      {{ isCreating ? 'Creating request…' : 'Review payment' }}
+      {{ isCreating ? 'Creating request…' : 'Continue' }}
     </button>
   </form>
 </template>
 
 <style scoped>
 h2 {
-  margin: 0 0 0.4rem;
-  font-size: 1.15rem;
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 800;
 }
 
 .hint {
-  margin: 0 0 1rem;
+  margin: 0 0 1.15rem;
   color: var(--muted);
+  font-weight: 600;
 }
 
 label {
   display: block;
-  margin: 0 0 0.35rem;
-  font-size: 0.85rem;
-  font-weight: 650;
+  margin: 0 0 0.3rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--muted);
 }
 
 .optional {
   margin-left: 0.4rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--muted);
 }
 
-input {
+input,
+select {
   display: block;
   width: 100%;
-  min-height: 44px;
-  margin: 0.35rem 0 0.75rem;
+  min-height: 48px;
+  margin: 0.35rem 0 0.85rem;
   border: 1px solid var(--line);
-  border-radius: 0.7rem;
-  padding: 0.625rem 0.75rem;
-  background: var(--ink);
+  border-radius: 0.9rem;
+  padding: 0.7rem 0.85rem;
+  background: var(--surface-soft);
   color: var(--text);
   overflow-wrap: anywhere;
 }
 
+.amount-field {
+  position: relative;
+  display: block;
+  margin: 0.35rem 0 0.85rem;
+}
+
+.amount-field input {
+  margin: 0;
+  padding-right: 3.6rem;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.suffix {
+  position: absolute;
+  top: 50%;
+  right: 0.95rem;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-weight: 800;
+}
+
+select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 12px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
 input::placeholder {
-  color: #6d7f96;
+  color: #8aa0b5;
+  font-weight: 600;
 }
 
 input[aria-invalid='true'] {
@@ -138,22 +174,23 @@ input[aria-invalid='true'] {
   align-items: baseline;
   justify-content: space-between;
   gap: 0.35rem 0.75rem;
-  margin: 0 0 1rem;
-  padding: 0.75rem 0.85rem;
+  margin: 0.15rem 0 0.85rem;
+  padding: 0.85rem 0.95rem;
   border: 1px solid var(--line);
-  border-radius: 0.7rem;
-  font-size: 0.85rem;
-  font-weight: 650;
+  border-radius: 0.9rem;
+  background: var(--surface-soft);
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--muted);
 }
 
 .network strong {
   font-size: 1rem;
-  font-weight: 650;
-  overflow-wrap: anywhere;
+  color: var(--text);
 }
 
 .error {
-  margin: -0.45rem 0 0.75rem;
+  margin: -0.55rem 0 0.85rem;
   color: var(--danger);
 }
 </style>
