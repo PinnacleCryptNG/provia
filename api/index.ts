@@ -78,6 +78,65 @@ export function adaptVercelRequest(req: IncomingMessage): IncomingMessage {
   return replay
 }
 
+export async function incomingFromWebRequest(request: Request): Promise<IncomingMessage> {
+  const url = new URL(request.url)
+  const body = request.method === 'GET' || request.method === 'HEAD'
+    ? Buffer.alloc(0)
+    : Buffer.from(await request.arrayBuffer())
+  const req = Readable.from(body) as IncomingMessage
+  req.method = request.method
+  req.url = `${url.pathname}${url.search}`
+  req.headers = Object.fromEntries(request.headers.entries())
+  return req
+}
+
+function collectListenerResponse(
+  listener: (req: IncomingMessage, res: ServerResponse) => unknown,
+  req: IncomingMessage,
+): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    let statusCode = 200
+    const headers = new Headers()
+    const chunks: Buffer[] = []
+    let finished = false
+
+    const finish = () => {
+      if (finished) {
+        return
+      }
+      finished = true
+      resolve(new Response(chunks.length > 0 ? Buffer.concat(chunks) : null, {
+        status: statusCode,
+        headers,
+      }))
+    }
+
+    const res = {
+      writeHead(status: number, hdrs?: NodeJS.Dict<number | string | string[]>) {
+        statusCode = status
+        if (hdrs) {
+          for (const [key, value] of Object.entries(hdrs)) {
+            if (value === undefined) {
+              continue
+            }
+            headers.set(key, Array.isArray(value) ? value.join(', ') : String(value))
+          }
+        }
+        return res
+      },
+      end(chunk?: unknown) {
+        if (chunk !== undefined && chunk !== null) {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)))
+        }
+        finish()
+        return res
+      },
+    } as ServerResponse
+
+    Promise.resolve(listener(req, res)).catch(reject)
+  })
+}
+
 export function createVercelApiHandler(options: ProviaServerOptions = {}) {
   const observe = options.observe ?? createNimiqRpcObserver()
   const intents = options.intents ?? createIntentStore()
@@ -87,8 +146,35 @@ export function createVercelApiHandler(options: ProviaServerOptions = {}) {
   return (req: IncomingMessage, res: ServerResponse) => listener(adaptVercelRequest(req), res)
 }
 
-const handler = createVercelApiHandler()
-
-export default async function vercelApiHandler(req: IncomingMessage, res: ServerResponse) {
-  await handler(req, res)
+export function createVercelFetchHandler(options: ProviaServerOptions = {}) {
+  const nodeHandler = createVercelApiHandler(options)
+  return async (request: Request) => {
+    return collectListenerResponse(nodeHandler, await incomingFromWebRequest(request))
+  }
 }
+
+const nodeHandler = createVercelApiHandler()
+
+async function fetchHandler(request: Request) {
+  return collectListenerResponse(nodeHandler, await incomingFromWebRequest(request))
+}
+
+function isNodeResponse(res: ServerResponse | undefined): res is ServerResponse {
+  return typeof res?.writeHead === 'function'
+}
+
+export default async function vercelApiHandler(
+  req: IncomingMessage | Request,
+  res?: ServerResponse,
+): Promise<Response | void> {
+  if (isNodeResponse(res) && !(req instanceof Request)) {
+    await nodeHandler(req, res)
+    return
+  }
+
+  return fetchHandler(req as Request)
+}
+
+export const GET = vercelApiHandler
+export const POST = vercelApiHandler
+export const OPTIONS = vercelApiHandler

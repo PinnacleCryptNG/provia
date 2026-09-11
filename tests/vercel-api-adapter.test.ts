@@ -6,6 +6,7 @@ import type { IncomingMessage } from 'node:http'
 import {
   adaptVercelRequest,
   createVercelApiHandler,
+  createVercelFetchHandler,
   proviaApiUrl,
 } from '../api/index.ts'
 import { isIntentId } from '../src/lib/ids.ts'
@@ -128,6 +129,19 @@ describe('Vercel API adapter', () => {
     const adapted = adaptVercelRequest(req)
     assert.equal(adapted.url, '/api/intents')
     assert.equal(await readStream(adapted), JSON.stringify(INTENT_DRAFT))
+  })
+
+  it('handles a Web Fetch Request the way Vercel /api functions do', async () => {
+    const rpc = createTrackedRpcObserver(() => rpcNotFound())
+    const handle = createVercelFetchHandler({ observe: rpc.observe })
+    const response = await handle(new Request('http://provia.local/api/intents', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(INTENT_DRAFT),
+    }))
+    assert.equal(response.status, 201)
+    const json = await response.json() as { intentId: string }
+    assert.equal(isIntentId(json.intentId), true)
   })
 })
 

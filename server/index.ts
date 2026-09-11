@@ -287,6 +287,10 @@ export function startProviaServer(options: ProviaServerOptions = {}): http.Serve
   return server
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+  !process.env.VERCEL
+  && process.argv[1]
+  && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   startProviaServer()
 }
