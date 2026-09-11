@@ -3,7 +3,7 @@ import { shortenNimiqAddress } from '../lib/address'
 import type { PaymentIntent } from '../lib/intent'
 import { nimiqNetworkLabel } from '../lib/network'
 
-defineProps<{
+const props = defineProps<{
   intent: PaymentIntent
   isSubmitting: boolean
   errorMessage: string | null
@@ -13,6 +13,14 @@ const emit = defineEmits<{
   back: []
   confirm: []
 }>()
+
+function confirm() {
+  if (props.isSubmitting) {
+    return
+  }
+
+  emit('confirm')
+}
 </script>
 
 <template>
@@ -45,9 +53,10 @@ const emit = defineEmits<{
       type="button"
       class="primary"
       :disabled="isSubmitting"
-      @click="emit('confirm')"
+      :aria-busy="isSubmitting"
+      @click="confirm"
     >
-      {{ isSubmitting ? 'Waiting for Nimiq Pay…' : 'Confirm in Nimiq Pay' }}
+      {{ isSubmitting ? 'Opening Nimiq Pay…' : 'Confirm in Nimiq Pay' }}
     </button>
     <button
       type="button"

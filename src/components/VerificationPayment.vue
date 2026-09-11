@@ -39,7 +39,7 @@ const showStatus = computed(() => {
 
     <p v-if="view.isChecking && !view.progress" class="checking" role="status">
       <span class="pulse" aria-hidden="true" />
-      Checking the blockchain
+      Checking the Nimiq blockchain…
     </p>
 
     <div v-if="view.progress" class="progress">
@@ -84,12 +84,20 @@ const showStatus = computed(() => {
       Check again
     </button>
     <button
-      v-if="!view.isChecking && view.kind !== 'submitted'"
+      v-if="showNotVerified"
       type="button"
-      :class="view.canRetry || view.showVerifiedLabel || showNotVerified ? 'secondary' : 'primary'"
+      class="secondary"
       @click="emit('restart')"
     >
-      Send an asset
+      Back to send
+    </button>
+    <button
+      v-else-if="view.showVerifiedLabel"
+      type="button"
+      class="primary"
+      @click="emit('restart')"
+    >
+      Send another asset
     </button>
   </section>
 </template>

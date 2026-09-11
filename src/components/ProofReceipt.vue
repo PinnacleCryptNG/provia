@@ -120,11 +120,11 @@ async function copyRecord() {
 
     <p v-if="copyError" class="error" role="alert">{{ copyError }}</p>
 
-    <button type="button" class="primary" @click="copyRecord">
-      {{ copied ? 'Copied' : 'Copy verification record' }}
+    <button type="button" class="primary" @click="emit('restart')">
+      Send another asset
     </button>
-    <button type="button" class="secondary" @click="emit('restart')">
-      Send an asset
+    <button type="button" class="secondary" @click="copyRecord">
+      {{ copied ? 'Copied' : 'Copy verification record' }}
     </button>
   </section>
 </template>

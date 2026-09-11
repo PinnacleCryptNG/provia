@@ -9,6 +9,7 @@ import PaymentDetailsChecked from './components/PaymentDetailsChecked.vue'
 import ProofReceipt from './components/ProofReceipt.vue'
 import ReviewPayment from './components/ReviewPayment.vue'
 import VerificationPayment from './components/VerificationPayment.vue'
+import WalletSendOutcome from './components/WalletSendOutcome.vue'
 import { shortenNimiqAddress } from './lib/address'
 import { isIntentId, isProofId } from './lib/ids'
 import {
@@ -22,13 +23,16 @@ import {
 } from './lib/intent'
 import {
   initializeNimiqProvider,
-  isUserRejection,
   listNimiqAccounts,
   sendBasicNimPayment,
   toProviderConnectionError,
-  toUserFacingError,
   type PaymentSendDiagnostic,
 } from './lib/nimiq'
+import {
+  canStartWalletSend,
+  classifyWalletSendError,
+  isWalletHashLocator,
+} from './lib/wallet-send'
 import {
   createProviaApiVerificationService,
   createServerIntent,
@@ -51,7 +55,7 @@ type JourneyStep = 'create' | 'checked' | 'review' | 'observing' | 'verdict'
 const SUBMITTED_DWELL_MS = 1_200
 const LIVE_MAX_OBSERVATION_ATTEMPTS = 18
 
-const isConnectingWallet = ref(true)
+const isConnectingWallet = ref(false)
 const isProviderReady = ref(false)
 const initError = ref<string | null>(null)
 const accountLabel = ref<string | null>(null)
@@ -60,6 +64,7 @@ const createError = ref<string | null>(null)
 const submitError = ref<string | null>(null)
 const isCreatingIntent = ref(false)
 const isSubmitting = ref(false)
+const walletOutcome = ref<'cancelled' | 'failed' | null>(null)
 const screen = ref<Screen>('home')
 const intent = ref<PaymentIntent | null>(null)
 const flowState = ref<VerificationFlowState | null>(null)
@@ -75,6 +80,7 @@ const SendDiagnostic = import.meta.env.DEV
 
 let provider: NimiqProvider | null = null
 let observationRun = 0
+let sendInFlight = false
 const verificationService = createProviaApiVerificationService()
 
 const showPaymentFlow = computed(() => {
@@ -114,20 +120,24 @@ function clearProofQuery() {
   window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
 }
 
+async function bindProvider() {
+  provider = await initializeNimiqProvider()
+  isProviderReady.value = true
+  try {
+    const accounts = await listNimiqAccounts(provider)
+    accountLabel.value = accounts[0] ? shortenNimiqAddress(accounts[0]) : 'Connected'
+  }
+  catch {
+    accountLabel.value = 'Connected'
+  }
+}
+
 async function connectWallet() {
   isConnectingWallet.value = true
   initError.value = null
 
   try {
-    provider = await initializeNimiqProvider()
-    isProviderReady.value = true
-    try {
-      const accounts = await listNimiqAccounts(provider)
-      accountLabel.value = accounts[0] ? shortenNimiqAddress(accounts[0]) : 'Connected'
-    }
-    catch {
-      accountLabel.value = 'Connected'
-    }
+    await bindProvider()
   }
   catch (error) {
     provider = null
@@ -155,8 +165,6 @@ onMounted(async () => {
       proofError.value = 'PROVIA could not load this verification record.'
     }
   }
-
-  await connectWallet()
 })
 
 async function checkPaymentDetails(draft: PaymentDraft) {
@@ -200,19 +208,22 @@ async function checkPaymentDetails(draft: PaymentDraft) {
 
 function goToReview() {
   submitError.value = null
+  walletOutcome.value = null
   screen.value = 'review'
 }
 
 function backToCreate() {
   submitError.value = null
   isSubmitting.value = false
+  walletOutcome.value = null
   screen.value = 'create'
 }
 
-function backToChecked() {
+function returnToReview() {
   submitError.value = null
   isSubmitting.value = false
-  screen.value = 'checked'
+  walletOutcome.value = null
+  screen.value = 'review'
 }
 
 async function issueProofIfVerified() {
@@ -262,65 +273,111 @@ async function runObservation() {
 }
 
 async function confirmPayment() {
-  if (!intent.value || !isIntentId(intent.value.id)) {
-    submitError.value = 'This payment is incomplete. Go back and send it again.'
+  const current = intent.value
+  if (!current || !isIntentId(current.id)) {
+    walletOutcome.value = 'failed'
     return
   }
 
-  if (!provider) {
-    submitError.value = 'Open this Mini App inside Nimiq Pay to submit the payment.'
+  if (!canStartWalletSend({
+    inFlight: sendInFlight,
+    hasSubmittedHash: Boolean(current.transactionHash),
+  })) {
+    if (current.transactionHash && !sendInFlight) {
+      flowState.value = stateAfterWalletHash(current)
+      screen.value = 'verify'
+      void runObservation()
+    }
     return
   }
 
-  submitError.value = null
+  sendInFlight = true
   isSubmitting.value = true
+  submitError.value = null
+  walletOutcome.value = null
 
   try {
+    if (!provider) {
+      try {
+        await bindProvider()
+      }
+      catch (error) {
+        if (import.meta.env.DEV) {
+          console.info('[PROVIA send error]', error)
+        }
+        walletOutcome.value = 'failed'
+        return
+      }
+    }
+
+    if (!provider) {
+      walletOutcome.value = 'failed'
+      return
+    }
+
     const diagnostic = await sendBasicNimPayment(provider, {
-      recipient: intent.value.recipient,
-      valueLuna: intent.value.amountLuna,
-      intentId: intent.value.id,
+      recipient: current.recipient,
+      valueLuna: current.amountLuna,
+      intentId: current.id,
     })
+
+    if (!isWalletHashLocator(diagnostic.transactionHash)) {
+      walletOutcome.value = 'failed'
+      return
+    }
+
     sendDiagnostic.value = diagnostic
-    const submitted = withSubmittedHash(intent.value, diagnostic.transactionHash)
+    const submitted = withSubmittedHash(current, diagnostic.transactionHash)
     intent.value = submitted
     flowState.value = stateAfterWalletHash(submitted)
     screen.value = 'verify'
     const runId = observationRun
     window.setTimeout(() => {
-      if (runId === observationRun) {
+      if (runId === observationRun && submitted.transactionHash) {
         void runObservation()
       }
     }, SUBMITTED_DWELL_MS)
   }
   catch (error) {
-    intent.value = isUserRejection(error)
-      ? withRejectedStatus(intent.value)
-      : withFailedStatus(intent.value)
-    submitError.value = toUserFacingError(error)
+    if (import.meta.env.DEV) {
+      console.info('[PROVIA send error]', error)
+    }
+    const outcome = classifyWalletSendError(error)
+    intent.value = outcome === 'cancelled'
+      ? withRejectedStatus(current)
+      : withFailedStatus(current)
+    walletOutcome.value = outcome
   }
   finally {
+    sendInFlight = false
     isSubmitting.value = false
   }
 }
 
 function retryVerification() {
+  if (sendInFlight || isSubmitting.value) {
+    return
+  }
+
   void runObservation()
 }
 
 function restart() {
+  sendInFlight = false
   observationRun += 1
   formErrors.value = {}
   createError.value = null
   submitError.value = null
   proofError.value = null
   sharedProofMissing.value = false
+  walletOutcome.value = null
+  isSubmitting.value = false
   intent.value = null
   flowState.value = null
   proof.value = null
   createFormKey.value += 1
   sendDiagnostic.value = null
-  screen.value = 'home'
+  screen.value = 'create'
   clearProofQuery()
 }
 </script>
@@ -348,10 +405,6 @@ function restart() {
     </section>
 
     <template v-if="showPaymentFlow">
-      <section v-if="!isProviderReady && !isConnectingWallet && screen !== 'home'" class="banner" role="alert">
-        <p>{{ initError ?? 'Open this Mini App inside Nimiq Pay. A browser window cannot submit a payment.' }}</p>
-      </section>
-
       <JourneySteps
         v-if="screen === 'checked' || screen === 'review' || screen === 'verify'"
         :current="journeyStep"
@@ -376,12 +429,18 @@ function restart() {
         @review="goToReview"
       />
       <ReviewPayment
-        v-if="screen === 'review' && intent"
+        v-if="screen === 'review' && intent && !walletOutcome"
         :intent="intent"
         :is-submitting="isSubmitting"
         :error-message="submitError"
-        @back="backToChecked"
+        @back="backToCreate"
         @confirm="confirmPayment"
+      />
+      <WalletSendOutcome
+        v-if="screen === 'review' && intent && walletOutcome"
+        :kind="walletOutcome"
+        @retry="returnToReview"
+        @back="backToCreate"
       />
       <VerificationPayment
         v-if="screen === 'verify' && flowState && !proof"
@@ -406,18 +465,6 @@ function restart() {
   margin: 0 auto;
   padding: 1.1rem 1rem calc(1.6rem + env(safe-area-inset-bottom, 0px));
   overflow-wrap: anywhere;
-}
-
-.banner {
-  margin: 0 0 1rem;
-  padding: 0.9rem 0.95rem;
-  border-radius: 0.95rem;
-  border: 1px solid rgb(196 138 18 / 28%);
-  background: rgb(196 138 18 / 10%);
-}
-
-.banner p {
-  margin: 0;
 }
 
 .error {

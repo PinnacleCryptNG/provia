@@ -12,6 +12,7 @@ const PRODUCTION_UI_FILES = [
   'src/components/VerificationPayment.vue',
   'src/components/ProofReceipt.vue',
   'src/components/JourneySteps.vue',
+  'src/components/WalletSendOutcome.vue',
   'src/lib/verification-view.ts',
 ]
 
@@ -37,6 +38,7 @@ const PRIMARY_FLOW_FILES = [
   'src/components/ReviewPayment.vue',
   'src/components/VerificationPayment.vue',
   'src/components/ProofReceipt.vue',
+  'src/components/WalletSendOutcome.vue',
 ]
 
 function read(relativePath: string): string {
@@ -164,5 +166,66 @@ describe('send-an-asset primary flow', () => {
     assert.doesNotMatch(checked, /sendBasicNimPayment|Confirm in Nimiq Pay/)
     assert.match(app, /@review="goToReview"/)
     assert.match(app, /@confirm="confirmPayment"/)
+  })
+
+  it('prevents duplicate Confirm in Nimiq Pay submissions', () => {
+    const app = read('src/App.vue')
+    const review = read('src/components/ReviewPayment.vue')
+    assert.match(review, /Opening Nimiq Pay/)
+    assert.match(review, /:disabled="isSubmitting"/)
+    assert.match(review, /if \(props\.isSubmitting\)/)
+    assert.match(app, /canStartWalletSend/)
+    assert.match(app, /sendInFlight = true/)
+  })
+
+  it('keeps Connect Wallet optional and does not connect on launch', () => {
+    const app = read('src/App.vue')
+    const mounted = app.slice(app.indexOf('onMounted(async'), app.indexOf('async function checkPaymentDetails'))
+    assert.doesNotMatch(mounted, /connectWallet|bindProvider/)
+    assert.match(app, /@connect="connectWallet"/)
+    assert.match(app, /isConnectingWallet = ref\(false\)/)
+  })
+
+  it('routes wallet cancellation and failure to recoverable states without resending', () => {
+    const app = read('src/App.vue')
+    const outcome = read('src/components/WalletSendOutcome.vue')
+    const retry = app.slice(app.indexOf('function returnToReview'), app.indexOf('async function issueProofIfVerified'))
+    assert.match(outcome, /Payment cancelled/)
+    assert.match(outcome, /Your payment wasn’t sent/)
+    assert.match(outcome, /Payment couldn’t be sent/)
+    assert.match(outcome, /No automatic retry was made/)
+    assert.match(outcome, /Try again/)
+    assert.doesNotMatch(retry, /sendBasicNimPayment/)
+    assert.match(app, /classifyWalletSendError/)
+    assert.match(app, /@retry="returnToReview"/)
+  })
+
+  it('treats a successful wallet hash as submitted, then observes independently', () => {
+    const app = read('src/App.vue')
+    const confirmFn = app.slice(
+      app.indexOf('async function confirmPayment'),
+      app.indexOf('function retryVerification'),
+    )
+    assert.match(confirmFn, /sendBasicNimPayment/)
+    assert.match(confirmFn, /withSubmittedHash/)
+    assert.match(confirmFn, /stateAfterWalletHash/)
+    assert.match(confirmFn, /screen\.value = 'verify'/)
+    assert.match(confirmFn, /runObservation/)
+    assert.doesNotMatch(confirmFn, /verifyPayment\(/)
+    assert.doesNotMatch(confirmFn, /Payment verified/)
+  })
+
+  it('starts a fresh send from a verified record without reusing the intent', () => {
+    const app = read('src/App.vue')
+    const receipt = read('src/components/ProofReceipt.vue')
+    const verifying = read('src/components/VerificationPayment.vue')
+    const restart = app.slice(app.indexOf('function restart'), app.indexOf('</script>'))
+    assert.match(receipt, /Send another asset/)
+    assert.match(verifying, /Send another asset/)
+    assert.match(verifying, /Back to send/)
+    assert.match(restart, /intent\.value = null/)
+    assert.match(restart, /screen\.value = 'create'/)
+    assert.match(restart, /createFormKey\.value \+= 1/)
+    assert.doesNotMatch(restart, /sendBasicNimPayment/)
   })
 })
