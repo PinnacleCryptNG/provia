@@ -99,8 +99,8 @@ function progressFrom(result: VerificationResult): ConfirmationProgress | null {
 function statusSteps(found: boolean, confirmed: boolean): StatusStep[] {
   return [
     { label: 'Payment submitted', done: true },
-    { label: 'Transaction found', done: found },
-    { label: confirmed ? 'Confirmations complete' : 'Confirmations pending', done: confirmed },
+    { label: 'Payment found', done: found },
+    { label: 'Confirming …', done: confirmed },
   ]
 }
 
@@ -127,23 +127,10 @@ function withLayout(
   }
 }
 
-function paymentSummary(intent: PaymentIntent, result?: VerificationResult): EvidenceRow[] {
-  return [
-    {
-      label: 'Recipient',
-      value: recipientLabel(result?.expectedRecipient ?? intent.recipient),
-    },
-    {
-      label: 'Network',
-      value: nimiqNetworkLabel(intent.network),
-    },
-  ]
-}
-
 function transactionDetails(intent: PaymentIntent, result?: VerificationResult): EvidenceRow[] {
   const rows: EvidenceRow[] = [
     {
-      label: 'Transaction',
+      label: 'Transaction hash',
       value: hashLabel(result?.transactionHash ?? intent.transactionHash),
     },
   ]
@@ -162,6 +149,11 @@ function transactionDetails(intent: PaymentIntent, result?: VerificationResult):
     })
   }
 
+  rows.push({
+    label: 'Network',
+    value: nimiqNetworkLabel(intent.network),
+  })
+
   return rows
 }
 
@@ -170,15 +162,15 @@ export function submittedView(intent: PaymentIntent): VerificationViewModel {
     kind: 'submitted',
     eyebrow: 'Submitted',
     title: 'Payment submitted',
-    message: 'Your payment was accepted by Nimiq Pay. PROVIA is now checking the blockchain.',
-    note: 'Verification is still in progress.',
+    message: 'Your payment was submitted. PROVIA is checking the Nimiq blockchain now.',
+    note: null,
     tone: 'neutral',
     showVerifiedLabel: false,
     canRetry: false,
     isChecking: false,
     progress: null,
-    heroAmount: `${intent.amountNim} NIM`,
-    summaryRows: paymentSummary(intent),
+    heroAmount: null,
+    summaryRows: [],
     detailRows: transactionDetails(intent),
     statusSteps: statusSteps(false, false),
   })
@@ -197,7 +189,7 @@ export function observingView(intent: PaymentIntent): VerificationViewModel {
     isChecking: true,
     progress: null,
     heroAmount: `${intent.amountNim} NIM`,
-    summaryRows: paymentSummary(intent),
+    summaryRows: [],
     detailRows: transactionDetails(intent),
     statusSteps: statusSteps(false, false),
   })
@@ -208,7 +200,7 @@ function waitingView(intent: PaymentIntent, result: VerificationResult): Verific
     kind: 'waiting',
     eyebrow: 'Verifying',
     title: 'Verifying payment',
-    message: 'PROVIA is independently checking the Nimiq blockchain. The payment does not yet have enough blockchain confirmations.',
+    message: 'PROVIA is independently checking the Nimiq blockchain.',
     note: null,
     tone: 'waiting',
     showVerifiedLabel: false,
@@ -221,7 +213,7 @@ function waitingView(intent: PaymentIntent, result: VerificationResult): Verific
       percent: 0,
     },
     heroAmount: `${intent.amountNim} NIM`,
-    summaryRows: paymentSummary(intent, result),
+    summaryRows: [],
     detailRows: transactionDetails(intent, result),
     statusSteps: statusSteps(true, false),
   })
@@ -240,7 +232,7 @@ function notFoundView(intent: PaymentIntent, result: VerificationResult): Verifi
     isChecking: false,
     progress: null,
     heroAmount: `${intent.amountNim} NIM`,
-    summaryRows: paymentSummary(intent, result),
+    summaryRows: [],
     detailRows: transactionDetails(intent, result),
     statusSteps: statusSteps(false, false),
   })
@@ -263,7 +255,7 @@ function unresolvedEvidenceView(intent: PaymentIntent, result: VerificationResul
     isChecking: false,
     progress: null,
     heroAmount: `${intent.amountNim} NIM`,
-    summaryRows: paymentSummary(intent, result),
+    summaryRows: [],
     detailRows: transactionDetails(intent, result),
     statusSteps: statusSteps(false, false),
   })
@@ -297,9 +289,9 @@ function verifiedView(intent: PaymentIntent, result: VerificationResult): Verifi
     showVerifiedLabel: true,
     canRetry: false,
     isChecking: false,
-    progress: progressFrom(result),
+    progress: null,
     heroAmount: amount,
-    detailsLabel: 'Verification details',
+    detailsLabel: 'View verification details',
     summaryRows: [
       {
         label: 'Recipient',
@@ -316,7 +308,7 @@ function verifiedView(intent: PaymentIntent, result: VerificationResult): Verifi
     ],
     detailRows: [
       {
-        label: 'Transaction',
+        label: 'Transaction hash',
         value: result.transactionHash ?? 'Unavailable',
       },
       {
@@ -329,9 +321,6 @@ function verifiedView(intent: PaymentIntent, result: VerificationResult): Verifi
           ? 'Unavailable'
           : confirmationProgressLabel(result.confirmations, result.confirmationPolicy),
       },
-    ],
-    statusSteps: statusSteps(true, true),
-    rows: [
       {
         label: 'Amount',
         value: amount,
@@ -344,118 +333,45 @@ function verifiedView(intent: PaymentIntent, result: VerificationResult): Verifi
         label: 'Network',
         value: nimiqNetworkLabel(intent.network),
       },
-      {
-        label: 'Transaction',
-        value: result.transactionHash ?? 'Unavailable',
-      },
-      {
-        label: 'Block',
-        value: result.observedBlockNumber === null ? 'Unavailable' : String(result.observedBlockNumber),
-      },
-      {
-        label: 'Confirmations',
-        value: result.confirmations === null
-          ? 'Unavailable'
-          : confirmationProgressLabel(result.confirmations, result.confirmationPolicy),
-      },
     ],
+    statusSteps: statusSteps(true, true),
   })
 }
 
 const NOT_VERIFIED_MESSAGE = 'The observed transaction does not satisfy this payment request.'
 
+function mismatchKind(result: VerificationResult): 'underpaid' | 'overpaid' | 'wrong_recipient' | 'mismatch' {
+  if (result.outcome === 'UNDERPAID') {
+    return 'underpaid'
+  }
+
+  if (result.reason === 'OVERPAID') {
+    return 'overpaid'
+  }
+
+  if (result.reason === 'WRONG_RECIPIENT') {
+    return 'wrong_recipient'
+  }
+
+  return 'mismatch'
+}
+
 function mismatchView(intent: PaymentIntent, result: VerificationResult): VerificationViewModel {
-  const base = {
+  return withLayout({
+    kind: mismatchKind(result),
     eyebrow: 'Not verified',
     title: 'Payment not verified',
     message: NOT_VERIFIED_MESSAGE,
-    tone: 'mismatch' as const,
+    note: null,
+    tone: 'mismatch',
     showVerifiedLabel: false,
     canRetry: false,
     isChecking: false,
     progress: null,
-    heroAmount: `${intent.amountNim} NIM`,
-    statusSteps: statusSteps(true, false),
-  }
-
-  if (result.outcome === 'UNDERPAID') {
-    return withLayout({
-      ...base,
-      kind: 'underpaid',
-      note: null,
-      summaryRows: [
-        {
-          label: 'Expected',
-          value: amountLabel(result.expectedAmountLuna),
-        },
-        {
-          label: 'Observed',
-          value: amountLabel(result.observedAmountLuna),
-        },
-      ],
-      detailRows: [
-        {
-          label: 'Transaction',
-          value: hashLabel(result.transactionHash ?? intent.transactionHash),
-        },
-      ],
-    })
-  }
-
-  if (result.reason === 'OVERPAID') {
-    return withLayout({
-      ...base,
-      kind: 'overpaid',
-      note: null,
-      summaryRows: [
-        {
-          label: 'Expected',
-          value: amountLabel(result.expectedAmountLuna),
-        },
-        {
-          label: 'Observed',
-          value: amountLabel(result.observedAmountLuna),
-        },
-      ],
-      detailRows: [
-        {
-          label: 'Transaction',
-          value: hashLabel(result.transactionHash ?? intent.transactionHash),
-        },
-      ],
-    })
-  }
-
-  if (result.reason === 'WRONG_RECIPIENT') {
-    return withLayout({
-      ...base,
-      kind: 'wrong_recipient',
-      note: null,
-      summaryRows: [
-        {
-          label: 'Expected recipient',
-          value: recipientLabel(result.expectedRecipient),
-        },
-        {
-          label: 'Observed recipient',
-          value: recipientLabel(result.observedRecipient),
-        },
-      ],
-      detailRows: [
-        {
-          label: 'Transaction',
-          value: hashLabel(result.transactionHash ?? intent.transactionHash),
-        },
-      ],
-    })
-  }
-
-  return withLayout({
-    ...base,
-    kind: 'mismatch',
-    note: null,
-    summaryRows: paymentSummary(intent, result),
+    heroAmount: null,
+    summaryRows: [],
     detailRows: transactionDetails(intent, result),
+    statusSteps: statusSteps(true, false),
   })
 }
 
@@ -471,23 +387,9 @@ function failedView(intent: PaymentIntent, result: VerificationResult): Verifica
     canRetry: false,
     isChecking: false,
     progress: null,
-    heroAmount: amountLabel(result.observedAmountLuna),
-    summaryRows: [
-      {
-        label: 'Recipient',
-        value: recipientLabel(result.observedRecipient),
-      },
-      {
-        label: 'Network',
-        value: nimiqNetworkLabel(intent.network),
-      },
-    ],
-    detailRows: [
-      {
-        label: 'Transaction',
-        value: hashLabel(result.transactionHash),
-      },
-    ],
+    heroAmount: null,
+    summaryRows: [],
+    detailRows: transactionDetails(intent, result),
     statusSteps: statusSteps(true, false),
   })
 }

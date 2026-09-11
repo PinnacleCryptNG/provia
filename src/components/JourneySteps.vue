@@ -2,11 +2,11 @@
 type StepId = 'create' | 'review' | 'submitted' | 'observing' | 'verdict'
 
 const STEPS: { id: StepId, label: string }[] = [
-  { id: 'create', label: 'Create' },
+  { id: 'create', label: 'Request' },
   { id: 'review', label: 'Review' },
-  { id: 'submitted', label: 'Submitted' },
-  { id: 'observing', label: 'Observing' },
-  { id: 'verdict', label: 'Verdict' },
+  { id: 'submitted', label: 'Sent' },
+  { id: 'observing', label: 'Verify' },
+  { id: 'verdict', label: 'Done' },
 ]
 
 const props = defineProps<{
@@ -67,10 +67,8 @@ li {
 }
 
 .label {
-  font-size: 0.68rem;
-  font-weight: 650;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 600;
   color: var(--muted);
   text-align: center;
   line-height: 1.2;

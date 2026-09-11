@@ -48,11 +48,21 @@ describe('production UI copy', () => {
     assert.match(source, /<select v-model="purpose"/)
     assert.match(source, /Select a purpose/)
     assert.match(source, /PAYMENT_PURPOSES/)
+    assert.match(source, /Nimiq Testnet/)
     assert.match(purposes, /Invoice/)
     assert.match(purposes, /Gift/)
     assert.match(purposes, /Utilities/)
     assert.match(purposes, /Friends & Family/)
     assert.doesNotMatch(source, /type="text"\s+name="purpose"/)
+  })
+
+  it('keeps the homepage to a short request-a-payment prompt', () => {
+    const source = readFileSync(new URL('../src/components/HomeLanding.vue', import.meta.url), 'utf8')
+    assert.match(source, /Independent payment verification/)
+    assert.match(source, /Request a NIM payment and verify it independently on the Nimiq blockchain/)
+    assert.match(source, /Request a payment/)
+    assert.doesNotMatch(source, /60 confirmations/)
+    assert.doesNotMatch(source, /intent/i)
   })
 
   it('gates the send diagnostic panel behind development mode', () => {

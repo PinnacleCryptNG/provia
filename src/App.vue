@@ -37,7 +37,6 @@ import {
   type ProofRecord,
 } from './lib/observation-service'
 import { parseNimToLuna, lunaToSafeNumber } from './lib/amount'
-import { DEFAULT_NIMIQ_NETWORK, nimiqNetworkLabel } from './lib/network'
 import {
   DEFAULT_OBSERVATION_DELAY_MS,
   observePaymentEvidence,
@@ -76,8 +75,6 @@ const SendDiagnostic = import.meta.env.DEV
 let provider: NimiqProvider | null = null
 let observationRun = 0
 const verificationService = createProviaApiVerificationService()
-
-const networkLabel = nimiqNetworkLabel(DEFAULT_NIMIQ_NETWORK)
 
 const showPaymentFlow = computed(() => {
   return !proof.value && !sharedProofMissing.value
@@ -319,7 +316,6 @@ function restart() {
 <template>
   <main class="app">
     <AppHeader
-      :network-label="networkLabel"
       :is-connecting="isConnectingWallet"
       :is-connected="isProviderReady"
       :account-label="accountLabel"
@@ -345,7 +341,7 @@ function restart() {
       </section>
 
       <JourneySteps
-        v-if="screen !== 'home'"
+        v-if="screen === 'review' || screen === 'verify'"
         :current="journeyStep"
       />
 
@@ -390,7 +386,7 @@ function restart() {
   max-width: 26.5rem;
   width: 100%;
   margin: 0 auto;
-  padding: 1.1rem 1rem 2.6rem;
+  padding: 1.1rem 1rem calc(1.6rem + env(safe-area-inset-bottom, 0px));
   overflow-wrap: anywhere;
 }
 
@@ -413,6 +409,6 @@ function restart() {
 h2 {
   margin: 0 0 0.5rem;
   font-size: 1.2rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 </style>

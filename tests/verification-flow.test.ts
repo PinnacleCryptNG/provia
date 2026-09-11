@@ -114,15 +114,19 @@ describe('verification UI orchestration', () => {
     assert.equal(view.title, 'Payment submitted')
     assert.equal(
       view.message,
-      'Your payment was accepted by Nimiq Pay. PROVIA is now checking the blockchain.',
+      'Your payment was submitted. PROVIA is checking the Nimiq blockchain now.',
     )
-    assert.equal(view.note, 'Verification is still in progress.')
+    assert.equal(view.note, null)
     assert.equal(view.showVerifiedLabel, false)
     assert.equal(view.kind, 'submitted')
     assert.equal(view.tone, 'neutral')
-    assert.ok(view.rows.some((row) => row.label === 'Transaction'))
-    assert.ok(view.summaryRows.some((row) => row.label === 'Recipient'))
-    assert.ok(view.summaryRows.some((row) => row.label === 'Network'))
+    assert.equal(view.summaryRows.length, 0)
+    assert.ok(view.detailRows.some((row) => row.label === 'Transaction hash'))
+    assert.ok(view.detailRows.some((row) => row.label === 'Network'))
+    assert.deepEqual(
+      view.statusSteps.map((step) => step.label),
+      ['Payment submitted', 'Payment found', 'Confirming …'],
+    )
   })
 
   it('shows observing copy while looking up independent evidence', () => {
@@ -139,6 +143,7 @@ describe('verification UI orchestration', () => {
     assert.match(view.message, /independently checking the Nimiq blockchain/)
     assert.equal(view.showVerifiedLabel, false)
     assert.ok(view.rows.some((row) => row.label === 'Network'))
+    assert.equal(view.summaryRows.length, 0)
   })
 
   it('keeps a not-found observation unresolved', async () => {
@@ -177,7 +182,7 @@ describe('verification UI orchestration', () => {
     assert.equal(view.title, 'Verifying payment')
     assert.equal(view.tone, 'waiting')
     assert.equal(view.showVerifiedLabel, false)
-    assert.match(view.message, /enough blockchain confirmations/)
+    assert.match(view.message, /independently checking the Nimiq blockchain/)
     assert.equal(view.progress?.current, MIN_CONFIRMATIONS - 1)
     assert.equal(view.progress?.required, MIN_CONFIRMATIONS)
     assert.equal(view.progress?.label, `${MIN_CONFIRMATIONS - 1} / ${MIN_CONFIRMATIONS} confirmations`)
@@ -202,9 +207,10 @@ describe('verification UI orchestration', () => {
     assert.ok(view.rows.some((row) => row.label === 'Amount'))
     assert.ok(view.rows.some((row) => row.label === 'Recipient'))
     assert.ok(view.rows.some((row) => row.label === 'Network'))
-    assert.ok(view.rows.some((row) => row.label === 'Transaction'))
+    assert.ok(view.rows.some((row) => row.label === 'Transaction hash'))
     assert.ok(view.rows.some((row) => row.label === 'Confirmations'))
     assert.ok(view.rows.some((row) => row.label === 'Block'))
+    assert.equal(view.detailsLabel, 'View verification details')
     assert.equal(verification.calls.length, 1)
     assert.deepEqual(delays, [])
   })
@@ -240,8 +246,7 @@ describe('verification UI orchestration', () => {
     assert.equal(view.kind, 'underpaid')
     assert.equal(view.title, 'Payment not verified')
     assert.equal(view.message, 'The observed transaction does not satisfy this payment request.')
-    assert.ok(view.rows.some((row) => row.label === 'Expected'))
-    assert.ok(view.rows.some((row) => row.label === 'Observed'))
+    assert.equal(view.summaryRows.length, 0)
     assert.equal(view.showVerifiedLabel, false)
   })
 

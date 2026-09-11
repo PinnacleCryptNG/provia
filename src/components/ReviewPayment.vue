@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { shortenNimiqAddress } from '../lib/address'
 import type { PaymentIntent } from '../lib/intent'
 import { nimiqNetworkLabel } from '../lib/network'
 
@@ -22,20 +23,20 @@ const emit = defineEmits<{
     <dl>
       <div>
         <dt>To</dt>
-        <dd class="address">{{ intent.recipient }}</dd>
-      </div>
-      <div>
-        <dt>Network</dt>
-        <dd>{{ nimiqNetworkLabel(intent.network) }}</dd>
+        <dd class="address">{{ shortenNimiqAddress(intent.recipient) }}</dd>
       </div>
       <div v-if="intent.purpose">
         <dt>Purpose</dt>
         <dd>{{ intent.purpose }}</dd>
       </div>
+      <div>
+        <dt>Network</dt>
+        <dd>{{ nimiqNetworkLabel(intent.network) }}</dd>
+      </div>
     </dl>
 
     <p class="notice">
-      After you approve the payment in Nimiq Pay, PROVIA will independently verify it on the Nimiq blockchain.
+      PROVIA will independently verify this payment on the Nimiq blockchain after you submit it.
     </p>
 
     <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
@@ -63,14 +64,14 @@ const emit = defineEmits<{
 h2 {
   margin: 0 0 0.85rem;
   font-size: 1.05rem;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--muted);
 }
 
 .amount {
   margin: 0 0 1rem;
   font-size: clamp(2rem, 8vw, 2.6rem);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1.1;
 }
@@ -86,17 +87,15 @@ dl div {
 
 dt {
   margin: 0 0 0.25rem;
-  font-size: 0.75rem;
-  font-weight: 800;
+  font-size: 0.88rem;
+  font-weight: 600;
   color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 dd {
   margin: 0;
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 600;
   overflow-wrap: anywhere;
   word-break: break-word;
 }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { shortenNimiqAddress } from '../lib/address'
 import { formatLunaAsNim } from '../lib/amount'
 import { formatVerificationTime } from '../lib/format'
 import { MIN_CONFIRMATIONS } from '../lib/verify'
@@ -18,6 +19,7 @@ const copied = ref(false)
 const copyError = ref<string | null>(null)
 
 const amount = computed(() => `${formatLunaAsNim(props.proof.observedAmountLuna)} NIM`)
+const recipient = computed(() => shortenNimiqAddress(props.proof.recipient))
 const verifiedAt = computed(() => formatVerificationTime(props.proof.verifiedAt))
 const confirmations = computed(() => {
   return props.proof.confirmationsAtVerification >= MIN_CONFIRMATIONS
@@ -65,7 +67,7 @@ async function copyRecord() {
     <dl>
       <div>
         <dt>Recipient</dt>
-        <dd class="address">{{ proof.recipient }}</dd>
+        <dd class="address">{{ recipient }}</dd>
       </div>
       <div>
         <dt>Network</dt>
@@ -78,10 +80,10 @@ async function copyRecord() {
     </dl>
 
     <details>
-      <summary>Verification details</summary>
+      <summary>View verification details</summary>
       <dl>
         <div>
-          <dt>Transaction</dt>
+          <dt>Transaction hash</dt>
           <dd class="hash">{{ proof.transactionHash }}</dd>
         </div>
         <div>
@@ -93,8 +95,20 @@ async function copyRecord() {
           <dd>{{ proof.confirmationsAtVerification }}</dd>
         </div>
         <div>
-          <dt>Verified</dt>
+          <dt>Verification time</dt>
           <dd>{{ verifiedAt }}</dd>
+        </div>
+        <div>
+          <dt>Amount</dt>
+          <dd>{{ amount }}</dd>
+        </div>
+        <div>
+          <dt>Recipient</dt>
+          <dd class="address">{{ proof.recipient }}</dd>
+        </div>
+        <div>
+          <dt>Network</dt>
+          <dd>{{ nimiqNetworkLabel(proof.network) }}</dd>
         </div>
       </dl>
     </details>
@@ -133,13 +147,13 @@ async function copyRecord() {
   background: rgb(26 163 106 / 14%);
   color: var(--verified);
   font-size: 1.5rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .title {
   margin: 0 0 0.5rem;
   font-size: clamp(1.55rem, 6vw, 1.95rem);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1.15;
   color: var(--verified);
@@ -150,18 +164,19 @@ async function copyRecord() {
 .session {
   margin: 0 0 0.7rem;
   color: var(--muted);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .disclaimer,
 .session {
-  font-size: 0.88rem;
+  font-size: 0.82rem;
+  opacity: 0.88;
 }
 
 .amount {
   margin: 0.2rem 0 1rem;
   font-size: clamp(2rem, 8vw, 2.55rem);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1.1;
   color: var(--text);
@@ -178,17 +193,15 @@ dl div {
 
 dt {
   margin: 0 0 0.2rem;
-  font-size: 0.72rem;
-  font-weight: 800;
+  font-size: 0.88rem;
+  font-weight: 600;
   color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 dd {
   margin: 0;
   font-size: 1.02rem;
-  font-weight: 700;
+  font-weight: 600;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
@@ -199,7 +212,7 @@ details {
 
 summary {
   cursor: pointer;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--primary);
 }
 

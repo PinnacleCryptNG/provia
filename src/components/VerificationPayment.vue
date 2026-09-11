@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import type { VerificationFlowState } from '../lib/verification-flow'
 import { toVerificationView } from '../lib/verification-view'
 
@@ -12,7 +12,6 @@ const emit = defineEmits<{
   restart: []
 }>()
 
-const detailsOpen = ref(false)
 const view = computed(() => toVerificationView(props.state))
 const showNotVerified = computed(() => {
   return view.value.kind === 'underpaid'
@@ -32,15 +31,13 @@ const showStatus = computed(() => {
 <template>
   <section class="receipt" :data-kind="view.kind">
     <div v-if="view.showVerifiedLabel" class="success-mark" aria-hidden="true">✓</div>
-    <p class="eyebrow">{{ view.eyebrow }}</p>
     <h2 :class="['title', view.tone]">{{ view.title }}</h2>
     <p class="message">{{ view.message }}</p>
-    <p v-if="view.note && view.showVerifiedLabel" class="disclaimer">{{ view.note }}</p>
-    <p v-else-if="view.note" class="note">{{ view.note }}</p>
+    <p v-if="view.note && !view.showVerifiedLabel" class="note">{{ view.note }}</p>
 
-    <p v-if="view.heroAmount" class="amount">{{ view.heroAmount }}</p>
+    <p v-if="view.heroAmount && view.kind !== 'submitted'" class="amount">{{ view.heroAmount }}</p>
 
-    <p v-if="view.isChecking" class="checking" role="status">
+    <p v-if="view.isChecking && !view.progress" class="checking" role="status">
       <span class="pulse" aria-hidden="true" />
       Checking the blockchain
     </p>
@@ -59,14 +56,14 @@ const showStatus = computed(() => {
       </li>
     </ol>
 
-    <dl class="summary">
+    <dl v-if="view.summaryRows.length > 0" class="summary">
       <div v-for="row in view.summaryRows" :key="row.label">
         <dt>{{ row.label }}</dt>
         <dd>{{ row.value }}</dd>
       </div>
     </dl>
 
-    <details v-if="view.detailRows.length > 0" class="details" :open="detailsOpen">
+    <details v-if="view.detailRows.length > 0" class="details">
       <summary>{{ view.detailsLabel }}</summary>
       <dl>
         <div v-for="row in view.detailRows" :key="row.label">
@@ -75,6 +72,8 @@ const showStatus = computed(() => {
         </div>
       </dl>
     </details>
+
+    <p v-if="view.note && view.showVerifiedLabel" class="disclaimer">{{ view.note }}</p>
 
     <button
       v-if="view.canRetry"
@@ -85,7 +84,7 @@ const showStatus = computed(() => {
       Check again
     </button>
     <button
-      v-if="!view.isChecking"
+      v-if="!view.isChecking && view.kind !== 'submitted'"
       type="button"
       :class="view.canRetry || view.showVerifiedLabel || showNotVerified ? 'secondary' : 'primary'"
       @click="emit('restart')"
@@ -131,22 +130,13 @@ const showStatus = computed(() => {
   background: rgb(26 163 106 / 14%);
   color: var(--verified);
   font-size: 1.45rem;
-  font-weight: 800;
-}
-
-.eyebrow {
-  margin: 0 0 0.3rem;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
+  font-weight: 700;
 }
 
 .title {
   margin: 0 0 0.45rem;
   font-size: clamp(1.4rem, 6vw, 1.8rem);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1.15;
 }
@@ -169,17 +159,18 @@ const showStatus = computed(() => {
 .disclaimer {
   margin: 0 0 0.85rem;
   color: var(--muted);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .disclaimer {
-  font-size: 0.88rem;
+  font-size: 0.84rem;
+  opacity: 0.88;
 }
 
 .amount {
   margin: 0 0 1rem;
   font-size: clamp(1.8rem, 7vw, 2.35rem);
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.03em;
   line-height: 1.1;
 }
@@ -212,8 +203,8 @@ const showStatus = computed(() => {
 
 .progress-label {
   margin: 0 0 0.45rem;
-  font-size: 0.95rem;
-  font-weight: 800;
+  font-size: 0.98rem;
+  font-weight: 700;
   color: var(--waiting);
 }
 
@@ -243,7 +234,7 @@ const showStatus = computed(() => {
   gap: 0.55rem;
   margin: 0 0 0.4rem;
   color: var(--muted);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .steps li[data-done='true'] {
@@ -252,7 +243,7 @@ const showStatus = computed(() => {
 
 .tick {
   width: 1.1rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .summary,
@@ -268,17 +259,15 @@ const showStatus = computed(() => {
 
 dt {
   margin: 0 0 0.2rem;
-  font-size: 0.72rem;
-  font-weight: 800;
+  font-size: 0.88rem;
+  font-weight: 600;
   color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 dd {
   margin: 0;
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 600;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
@@ -289,7 +278,7 @@ dd {
 
 .details summary {
   cursor: pointer;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--primary);
 }
 </style>
