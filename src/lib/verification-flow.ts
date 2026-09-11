@@ -10,7 +10,13 @@ export const DEFAULT_OBSERVATION_DELAY_MS = 4_000
 
 export type VerificationFlowState =
   | { screen: 'submitted', intent: PaymentIntent }
-  | { screen: 'checking', intent: PaymentIntent, attempt: number, maxAttempts: number }
+  | {
+    screen: 'checking'
+    intent: PaymentIntent
+    attempt: number
+    maxAttempts: number
+    lastResult?: VerificationResult
+  }
   | { screen: 'complete', intent: PaymentIntent, result: VerificationResult }
 
 export function expectedPaymentFromIntent(intent: PaymentIntent): ExpectedNimPayment {
@@ -94,6 +100,14 @@ export async function observePaymentEvidence(
       })
       return lastResult
     }
+
+    options.onState?.({
+      screen: 'checking',
+      intent: options.intent,
+      attempt,
+      maxAttempts,
+      lastResult,
+    })
 
     await delay(delayMs)
   }

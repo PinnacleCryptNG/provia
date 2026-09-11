@@ -1,8 +1,8 @@
 # PROVIA
 
-PROVIA is a Nimiq Pay Mini App for payment verification.
+PROVIA is a Nimiq Pay Mini App for independent payment verification.
 
-Thesis: **Intent → Evidence → Verification → Proof**.
+A successful wallet submission is not proof of payment. PROVIA checks Nimiq blockchain evidence independently, then issues a verification record only when the payment matches and has 60 confirmations.
 
 The Mini App creates a **server-owned payment intent**. After Nimiq Pay returns a transaction hash, the Mini App sends only `intentId` and `transactionHash`. The server looks up the stored intent, independently observes the Nimiq chain, and runs the shared `verifyPayment()` engine. A **PROVIA verification proof** is issued only when that engine returns `VERIFIED`.
 

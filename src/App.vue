@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
 import CreatePayment from './components/CreatePayment.vue'
+import JourneySteps from './components/JourneySteps.vue'
 import ProofReceipt from './components/ProofReceipt.vue'
 import ReviewPayment from './components/ReviewPayment.vue'
 import VerificationPayment from './components/VerificationPayment.vue'
@@ -19,6 +20,7 @@ import {
   initializeNimiqProvider,
   isUserRejection,
   sendBasicNimPayment,
+  toProviderConnectionError,
   toUserFacingError,
 } from './lib/nimiq'
 import {
@@ -31,12 +33,17 @@ import {
 } from './lib/observation-service'
 import { parseNimToLuna, lunaToSafeNumber } from './lib/amount'
 import {
+  DEFAULT_OBSERVATION_DELAY_MS,
   observePaymentEvidence,
   stateAfterWalletHash,
   type VerificationFlowState,
 } from './lib/verification-flow'
 
 type Screen = 'create' | 'review' | 'verify'
+type JourneyStep = 'create' | 'review' | 'submitted' | 'observing' | 'verdict'
+
+const SUBMITTED_DWELL_MS = 1_200
+const LIVE_MAX_OBSERVATION_ATTEMPTS = 18
 
 const isInitializing = ref(true)
 const isProviderReady = ref(false)
@@ -58,6 +65,32 @@ let provider: NimiqProvider | null = null
 let observationRun = 0
 const verificationService = createProviaApiVerificationService()
 
+const showPaymentFlow = computed(() => {
+  return !isInitializing.value && !proof.value && !sharedProofMissing.value
+})
+
+const journeyStep = computed<JourneyStep>(() => {
+  if (proof.value) {
+    return 'verdict'
+  }
+  if (screen.value === 'review') {
+    return 'review'
+  }
+  if (screen.value === 'verify' && flowState.value) {
+    if (flowState.value.screen === 'submitted') {
+      return 'submitted'
+    }
+    if (flowState.value.screen === 'checking') {
+      return 'observing'
+    }
+    if (flowState.value.result.reason === 'INSUFFICIENT_CONFIRMATIONS') {
+      return 'observing'
+    }
+    return 'verdict'
+  }
+  return 'create'
+})
+
 function proofIdFromLocation(): string | null {
   const value = new URLSearchParams(window.location.search).get('proof')
   return value && isProofId(value) ? value : null
@@ -76,12 +109,12 @@ onMounted(async () => {
       proof.value = await fetchServerProof(sharedProofId)
       if (!proof.value) {
         sharedProofMissing.value = true
-        proofError.value = 'This PROVIA verification proof was not found.'
+        proofError.value = 'This verification record is no longer available. PROVIA only keeps records for this session.'
       }
     }
     catch {
       sharedProofMissing.value = true
-      proofError.value = 'PROVIA could not load this verification proof.'
+      proofError.value = 'PROVIA could not load this verification record.'
     }
   }
 
@@ -90,7 +123,7 @@ onMounted(async () => {
     isProviderReady.value = true
   }
   catch (error) {
-    initError.value = toUserFacingError(error)
+    initError.value = toProviderConnectionError(error)
   }
   finally {
     isInitializing.value = false
@@ -129,7 +162,7 @@ async function reviewPayment(draft: PaymentDraft) {
   catch (error) {
     createError.value = error instanceof Error
       ? error.message
-      : 'PROVIA could not create the payment intent. Try again.'
+      : 'PROVIA could not create the payment request. Try again.'
   }
   finally {
     isCreatingIntent.value = false
@@ -159,7 +192,7 @@ async function issueProofIfVerified() {
   catch (error) {
     proofError.value = error instanceof Error
       ? error.message
-      : 'PROVIA could not create a verification proof.'
+      : 'PROVIA could not create a verification record.'
   }
 }
 
@@ -173,6 +206,8 @@ async function runObservation() {
   await observePaymentEvidence({
     intent: current,
     verification: verificationService,
+    maxAttempts: LIVE_MAX_OBSERVATION_ATTEMPTS,
+    delayMs: DEFAULT_OBSERVATION_DELAY_MS,
     onState(state) {
       if (runId !== observationRun) {
         return
@@ -188,12 +223,12 @@ async function runObservation() {
 
 async function confirmPayment() {
   if (!intent.value || !isIntentId(intent.value.id)) {
-    submitError.value = 'This payment has no server-owned intent ID.'
+    submitError.value = 'This payment has no server-owned request ID.'
     return
   }
 
   if (!provider) {
-    submitError.value = 'Nimiq provider is not ready. Open this app inside Nimiq Pay.'
+    submitError.value = 'Open this Mini App inside Nimiq Pay to submit the payment.'
     return
   }
 
@@ -209,9 +244,12 @@ async function confirmPayment() {
     intent.value = submitted
     flowState.value = stateAfterWalletHash(submitted)
     screen.value = 'verify'
-    queueMicrotask(() => {
-      void runObservation()
-    })
+    const runId = observationRun
+    window.setTimeout(() => {
+      if (runId === observationRun) {
+        void runObservation()
+      }
+    }, SUBMITTED_DWELL_MS)
   }
   catch (error) {
     intent.value = isUserRejection(error)
@@ -247,17 +285,30 @@ function restart() {
 <template>
   <main class="app">
     <header>
-      <p class="eyebrow">Payment verification</p>
-      <h1>PROVIA</h1>
-      <p class="lede">
-        Create a NIM payment intent, submit it through Nimiq Pay, then verify it
-        against independent blockchain evidence.
+      <div class="brand">
+        <span class="mark" aria-hidden="true" />
+        <div>
+          <h1>PROVIA</h1>
+          <p class="tagline">Independent payment verification</p>
+        </div>
+      </div>
+      <p v-if="showPaymentFlow && screen === 'create'" class="lede">
+        A successful wallet submission is not proof of payment. PROVIA checks the Nimiq blockchain independently.
       </p>
-      <p v-if="isProviderReady && !proof" class="connected">Nimiq Pay connected</p>
-      <p v-else-if="!proof && !isInitializing" class="status">
-        Sending a payment requires Nimiq Pay. You can still create and review an intent here.
-      </p>
+      <p v-if="isProviderReady && showPaymentFlow" class="connected">Nimiq Pay connected</p>
     </header>
+
+    <section
+      v-if="isInitializing && !proof && !sharedProofMissing"
+      class="panel connecting"
+      role="status"
+    >
+      <p class="checking">
+        <span class="pulse" aria-hidden="true" />
+        Connecting to Nimiq Pay
+      </p>
+      <p>Nimiq Pay is required to securely submit the payment. PROVIA will not treat a wallet confirmation as verification.</p>
+    </section>
 
     <ProofReceipt
       v-if="proof"
@@ -266,16 +317,20 @@ function restart() {
     />
 
     <section v-else-if="sharedProofMissing" class="panel" aria-live="polite">
-      <h2>Proof not available</h2>
+      <h2>Record not available</h2>
       <p class="error">{{ proofError }}</p>
-      <p>Ask the sender to create the payment again, or create a new payment in Nimiq Pay.</p>
+      <p>Verification records are kept for this session only.</p>
+      <button type="button" class="primary" @click="restart">Create a payment</button>
     </section>
 
-    <p v-if="isInitializing && !proof && !sharedProofMissing" class="status" role="status">
-      Waiting for Nimiq Pay to initialize the provider...
-    </p>
+    <template v-if="showPaymentFlow">
+      <section v-if="!isProviderReady" class="banner" role="alert">
+        <p>Open this Mini App inside Nimiq Pay. A browser window cannot submit a payment.</p>
+        <p v-if="initError" class="error">{{ initError }}</p>
+      </section>
 
-    <template v-if="!proof && !sharedProofMissing">
+      <JourneySteps :current="journeyStep" />
+
       <CreatePayment
         :key="createFormKey"
         v-show="screen === 'create'"
@@ -305,55 +360,116 @@ function restart() {
 
 <style scoped>
 .app {
-  max-width: 42rem;
+  max-width: 26.5rem;
   margin: 0 auto;
-  padding: 1.25rem 1rem 2.5rem;
+  padding: 1.15rem 1rem 2.5rem;
 }
 
 header {
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.1rem;
 }
 
-.eyebrow {
-  margin: 0 0 0.35rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.mark {
+  width: 2.15rem;
+  height: 2.15rem;
+  flex: 0 0 auto;
+  border: 1.5px solid var(--verified);
+  border-radius: 0.7rem;
+  background:
+    linear-gradient(180deg, rgb(62 207 159 / 16%), transparent),
+    var(--ink);
+}
+
+.mark::after {
+  content: '';
+  display: block;
+  width: 0.95rem;
+  height: 0.45rem;
+  margin: 0.72rem auto 0;
+  border-left: 2px solid var(--verified);
+  border-bottom: 2px solid var(--verified);
+  transform: rotate(-45deg);
 }
 
 h1 {
-  margin: 0 0 0.6rem;
-  font-size: clamp(1.75rem, 7vw, 2.4rem);
-  line-height: 1.15;
+  margin: 0;
+  font-size: 1.45rem;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
 }
 
-.lede,
-.status,
-.panel p {
-  margin: 0 0 0.85rem;
+.tagline {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--muted);
+}
+
+.lede {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
 }
 
 .connected {
   display: inline-block;
-  margin: 0 0 0.5rem;
-  color: var(--mint);
-  font-size: 0.9rem;
-  font-weight: 600;
+  margin: 0;
+  color: var(--verified);
+  font-size: 0.82rem;
+  font-weight: 650;
 }
 
-.panel {
-  padding: 1rem;
-  border-radius: 0.75rem;
-  background: var(--panel);
+.connecting p,
+.banner p {
+  margin: 0 0 0.75rem;
+}
+
+.connecting p:last-child,
+.banner p:last-child {
+  margin-bottom: 0;
+}
+
+.checking {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-weight: 650;
+}
+
+.pulse {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--submitted);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+.banner {
+  margin: 0 0 1rem;
+  padding: 0.9rem 0.95rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgb(224 180 79 / 35%);
+  background: rgb(224 180 79 / 10%);
 }
 
 .error {
   color: var(--danger);
 }
 
-code {
-  font-size: 0.92em;
+h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
 }
 </style>

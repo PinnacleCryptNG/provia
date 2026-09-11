@@ -29,8 +29,7 @@ function submit() {
 <template>
   <form class="panel" @submit.prevent="submit">
     <h2>Create payment</h2>
-    <p class="hint">Describe the NIM payment you intend to send. Nothing is submitted until you confirm it.</p>
-    <p class="network">Network: Nimiq Testnet</p>
+    <p class="hint">Enter the NIM payment to verify. Nothing is sent until you confirm in Nimiq Pay.</p>
 
     <label>
       Recipient
@@ -48,7 +47,7 @@ function submit() {
     <p v-if="errors.recipient" class="error" role="alert">{{ errors.recipient }}</p>
 
     <label>
-      Amount in NIM
+      Amount
       <input
         v-model="amount"
         type="text"
@@ -76,32 +75,20 @@ function submit() {
 
     <p v-if="serverError" class="error" role="alert">{{ serverError }}</p>
 
-    <button type="submit" :disabled="isCreating">
-      {{ isCreating ? 'Creating intent…' : 'Review payment' }}
+    <button type="submit" class="primary" :disabled="isCreating">
+      {{ isCreating ? 'Creating request…' : 'Review payment' }}
     </button>
   </form>
 </template>
 
 <style scoped>
-.panel {
-  padding: 1rem;
-  border-radius: 0.75rem;
-  background: var(--panel);
-}
-
 h2 {
   margin: 0 0 0.4rem;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
 }
 
 .hint {
-  margin: 0 0 0.55rem;
-  color: var(--muted);
-}
-
-.network {
   margin: 0 0 1rem;
-  font-size: 0.9rem;
   color: var(--muted);
 }
 
@@ -109,7 +96,7 @@ label {
   display: block;
   margin: 0 0 0.35rem;
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 650;
 }
 
 .optional {
@@ -124,7 +111,7 @@ input {
   min-height: 44px;
   margin: 0.35rem 0 0.75rem;
   border: 1px solid var(--line);
-  border-radius: 0.625rem;
+  border-radius: 0.7rem;
   padding: 0.625rem 0.75rem;
   background: var(--ink);
   color: var(--text);
@@ -141,21 +128,5 @@ input[aria-invalid='true'] {
 .error {
   margin: -0.45rem 0 0.75rem;
   color: var(--danger);
-}
-
-button {
-  width: 100%;
-  min-height: 44px;
-  margin-top: 0.35rem;
-  border: none;
-  border-radius: 0.625rem;
-  padding: 0.625rem 0.875rem;
-  font-weight: 600;
-  background: var(--primary);
-  color: #f4f8fc;
-}
-
-button:disabled {
-  opacity: 0.55;
 }
 </style>

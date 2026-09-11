@@ -62,11 +62,16 @@ export function toUserFacingError(error: unknown): string {
     return 'You declined the payment in Nimiq Pay. No transaction was sent.'
   }
 
-  if (error instanceof Error && error.message) {
-    return error.message
+  const message = error instanceof Error ? error.message : String(error)
+  if (/timeout|timed out|not available|provider/i.test(message)) {
+    return 'PROVIA could not connect to Nimiq Pay. Open this Mini App inside Nimiq Pay.'
   }
 
-  return String(error)
+  return 'Nimiq Pay could not submit this payment. No transaction was verified.'
+}
+
+export function toProviderConnectionError(_error: unknown): string {
+  return 'PROVIA could not connect to Nimiq Pay. Open this Mini App inside Nimiq Pay to submit a payment.'
 }
 
 export async function listNimiqAccounts(provider: NimiqProvider): Promise<string[]> {

@@ -114,10 +114,11 @@ describe('verification UI orchestration', () => {
     assert.equal(view.title, 'Payment submitted')
     assert.equal(
       view.message,
-      "Your transaction was submitted to the Nimiq network. We're waiting for blockchain evidence.",
+      'The wallet accepted the transaction. PROVIA has not verified it yet.',
     )
     assert.equal(view.showVerifiedLabel, false)
     assert.equal(view.kind, 'submitted')
+    assert.equal(view.tone, 'neutral')
     assert.ok(view.rows.some((row) => row.label === 'Transaction'))
     assert.ok(view.rows.some((row) => row.label === 'Amount'))
     assert.ok(view.rows.some((row) => row.label === 'Recipient'))
@@ -134,11 +135,12 @@ describe('verification UI orchestration', () => {
 
     assert.equal(result.outcome, 'UNRESOLVED')
     assert.equal(result.reason, 'NOT_FOUND')
-    assert.equal(view.title, 'Payment not verified yet')
+    assert.equal(view.title, 'Transaction not found yet')
     assert.equal(view.kind, 'unresolved')
     assert.equal(view.showVerifiedLabel, false)
     assert.equal(view.canRetry, true)
     assert.notEqual(view.title, 'Payment failed')
+    assert.match(view.message, /will not mark this payment as failed/)
     assert.equal(verification.calls.length, DEFAULT_MAX_OBSERVATION_ATTEMPTS)
     assert.deepEqual(delays, [DEFAULT_OBSERVATION_DELAY_MS, DEFAULT_OBSERVATION_DELAY_MS])
   })
@@ -155,9 +157,13 @@ describe('verification UI orchestration', () => {
     assert.equal(result.outcome, 'UNRESOLVED')
     assert.equal(result.reason, 'INSUFFICIENT_CONFIRMATIONS')
     assert.equal(view.kind, 'waiting')
-    assert.equal(view.title, 'Payment not verified yet')
+    assert.equal(view.title, 'Waiting for confirmations')
+    assert.equal(view.tone, 'waiting')
     assert.equal(view.showVerifiedLabel, false)
-    assert.match(view.message, /enough confirmations/)
+    assert.match(view.message, /enough blockchain confirmations/)
+    assert.equal(view.progress?.current, MIN_CONFIRMATIONS - 1)
+    assert.equal(view.progress?.required, MIN_CONFIRMATIONS)
+    assert.equal(view.progress?.label, `${MIN_CONFIRMATIONS - 1} / ${MIN_CONFIRMATIONS} confirmations`)
     assert.equal(verification.calls.length, DEFAULT_MAX_OBSERVATION_ATTEMPTS)
   })
 
@@ -174,10 +180,10 @@ describe('verification UI orchestration', () => {
     assert.equal(view.kind, 'verified')
     assert.equal(view.title, 'Payment verified')
     assert.equal(view.showVerifiedLabel, true)
-    assert.match(view.message, /recipient matches/)
-    assert.match(view.message, /amount matches/)
-    assert.match(view.message, /executed successfully/)
-    assert.match(view.message, /confirmation requirement/)
+    assert.match(view.message, /Recipient matched/)
+    assert.match(view.message, /amount matched/)
+    assert.match(view.message, /execution succeeded/)
+    assert.match(view.message, /60-confirmation/)
     assert.ok(view.rows.some((row) => row.label === 'Confirmations'))
     assert.ok(view.rows.some((row) => row.label === 'Block'))
     assert.equal(verification.calls.length, 1)
@@ -216,7 +222,7 @@ describe('verification UI orchestration', () => {
     assert.equal(view.title, "Payment doesn't match")
     assert.equal(
       view.message,
-      'PROVIA found the transaction, but the amount received is less than requested.',
+      'The amount observed on chain is less than the requested amount.',
     )
     assert.ok(view.rows.some((row) => row.label === 'Expected'))
     assert.ok(view.rows.some((row) => row.label === 'Observed'))
@@ -237,6 +243,7 @@ describe('verification UI orchestration', () => {
     assert.equal(view.kind, 'overpaid')
     assert.equal(view.title, "Payment doesn't match")
     assert.match(view.message, /greater than the requested amount/)
+    assert.equal(view.tone, 'mismatch')
     assert.equal(view.showVerifiedLabel, false)
   })
 
@@ -253,9 +260,46 @@ describe('verification UI orchestration', () => {
     assert.equal(result.reason, 'EXECUTION_FAILED')
     assert.equal(view.kind, 'failed')
     assert.equal(view.title, 'Payment failed')
+    assert.equal(view.tone, 'negative')
     assert.match(view.message, /execution failed/)
     assert.equal(view.showVerifiedLabel, false)
     assert.equal(verification.calls.length, 1)
+  })
+
+  it('does not style insufficient evidence or RPC errors as a failed payment', async () => {
+    const verification = scriptedVerification([{ status: 'rpc_error', message: 'timeout' }])
+    const { result } = await runFlow(verification)
+    const view = toVerificationView({
+      screen: 'complete',
+      intent: submittedIntent(),
+      result,
+    })
+
+    assert.equal(result.outcome, 'UNRESOLVED')
+    assert.equal(result.reason, 'RPC_ERROR')
+    assert.equal(view.kind, 'unresolved')
+    assert.equal(view.title, 'Could not retrieve evidence')
+    assert.notEqual(view.title, 'Payment failed')
+    assert.match(view.message, /does not mean the payment failed/)
+  })
+
+  it('keeps confirmation progress visible while still observing', () => {
+    const result = verifyPayment(
+      expectedPaymentFromIntent(submittedIntent()),
+      included({ confirmations: 34 }),
+    )
+    const view = toVerificationView({
+      screen: 'checking',
+      intent: submittedIntent(),
+      attempt: 2,
+      maxAttempts: DEFAULT_MAX_OBSERVATION_ATTEMPTS,
+      lastResult: result,
+    })
+
+    assert.equal(view.kind, 'waiting')
+    assert.equal(view.isChecking, true)
+    assert.equal(view.canRetry, false)
+    assert.equal(view.progress?.label, `34 / ${MIN_CONFIRMATIONS} confirmations`)
   })
 
   it('retries observation after an unresolved state', async () => {

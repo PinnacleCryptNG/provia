@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { PaymentIntent } from '../lib/intent'
-import { shortenNimiqAddress } from '../lib/address'
 import { nimiqNetworkLabel } from '../lib/network'
 
 defineProps<{
@@ -18,16 +17,16 @@ const emit = defineEmits<{
 <template>
   <section class="panel">
     <h2>Review payment</h2>
-    <p class="hint">Check the details. Nimiq Pay will ask you to approve the transaction only after you confirm.</p>
+    <p class="hint">Check every detail before Nimiq Pay asks you to approve. This is the last chance to catch a mistake.</p>
 
     <dl>
       <div>
-        <dt>You're sending</dt>
+        <dt>Amount</dt>
         <dd>{{ intent.amountNim }} NIM</dd>
       </div>
       <div>
-        <dt>To</dt>
-        <dd>{{ shortenNimiqAddress(intent.recipient) }}</dd>
+        <dt>Recipient</dt>
+        <dd class="address">{{ intent.recipient }}</dd>
       </div>
       <div>
         <dt>Network</dt>
@@ -39,6 +38,10 @@ const emit = defineEmits<{
       </div>
     </dl>
 
+    <p class="notice">
+      Wallet submission is not verification. PROVIA verifies the payment independently after it is submitted. Verification requires 60 blockchain confirmations.
+    </p>
+
     <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
 
     <button
@@ -47,7 +50,7 @@ const emit = defineEmits<{
       :disabled="isSubmitting"
       @click="emit('confirm')"
     >
-      {{ isSubmitting ? 'Waiting for Nimiq Pay…' : 'Confirm payment' }}
+      {{ isSubmitting ? 'Waiting for Nimiq Pay…' : 'Confirm in Nimiq Pay' }}
     </button>
     <button
       type="button"
@@ -61,15 +64,9 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
-.panel {
-  padding: 1rem;
-  border-radius: 0.75rem;
-  background: var(--panel);
-}
-
 h2 {
   margin: 0 0 0.4rem;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
 }
 
 .hint {
@@ -82,14 +79,14 @@ dl {
 }
 
 dl div {
-  padding: 0.75rem 0;
+  padding: 0.8rem 0;
   border-bottom: 1px solid var(--line);
 }
 
 dt {
-  margin: 0 0 0.25rem;
-  font-size: 0.8rem;
-  font-weight: 600;
+  margin: 0 0 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 650;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -97,37 +94,26 @@ dt {
 
 dd {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1.08rem;
   overflow-wrap: anywhere;
+}
+
+.address {
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+}
+
+.notice {
+  margin: 0 0 1rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 0.75rem;
+  background: rgb(224 180 79 / 10%);
+  color: var(--text);
+  font-size: 0.92rem;
 }
 
 .error {
   margin: 0 0 0.85rem;
   color: var(--danger);
-}
-
-button {
-  width: 100%;
-  min-height: 44px;
-  margin-top: 0.5rem;
-  border: none;
-  border-radius: 0.625rem;
-  padding: 0.625rem 0.875rem;
-  font-weight: 600;
-}
-
-.primary {
-  background: var(--primary);
-  color: #f4f8fc;
-}
-
-.secondary {
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--line);
-}
-
-button:disabled {
-  opacity: 0.55;
 }
 </style>

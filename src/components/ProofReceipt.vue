@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { shortenNimiqAddress, shortenTransactionHash } from '../lib/address'
 import { formatLunaAsNim } from '../lib/amount'
+import { formatVerificationTime } from '../lib/format'
+import { MIN_CONFIRMATIONS } from '../lib/verify'
 import { nimiqNetworkLabel } from '../lib/network'
 import type { ProofRecord } from '../lib/observation-service'
 
@@ -14,17 +15,27 @@ const emit = defineEmits<{
 }>()
 
 const copied = ref(false)
+const copyError = ref<string | null>(null)
 
 const amount = computed(() => `${formatLunaAsNim(props.proof.observedAmountLuna)} NIM`)
-const shareUrl = computed(() => {
-  const url = new URL(window.location.href)
-  url.searchParams.set('proof', props.proof.proofId)
-  return url.toString()
-})
+const verifiedAt = computed(() => formatVerificationTime(props.proof.verifiedAt))
 
-async function copyLink() {
+const recordText = computed(() => [
+  'PROVIA verification record — this session only',
+  'Status: VERIFIED',
+  `Amount: ${amount.value}`,
+  `Recipient: ${props.proof.recipient}`,
+  `Network: ${nimiqNetworkLabel(props.proof.network)}`,
+  `Transaction: ${props.proof.transactionHash}`,
+  `Block: ${props.proof.blockNumber === null ? 'Unavailable' : props.proof.blockNumber}`,
+  `Confirmations: ${props.proof.confirmationsAtVerification}`,
+  `Verified: ${verifiedAt.value}`,
+].join('\n'))
+
+async function copyRecord() {
+  copyError.value = null
   try {
-    await navigator.clipboard.writeText(shareUrl.value)
+    await navigator.clipboard.writeText(recordText.value)
     copied.value = true
     window.setTimeout(() => {
       copied.value = false
@@ -32,6 +43,7 @@ async function copyLink() {
   }
   catch {
     copied.value = false
+    copyError.value = 'Could not copy. You can still screenshot this record.'
   }
 }
 </script>
@@ -39,13 +51,12 @@ async function copyLink() {
 <template>
   <section class="receipt">
     <p class="eyebrow">PROVIA verification proof</p>
-    <h2 class="title positive">Payment verified</h2>
-    <p class="verified-mark">Verified against Nimiq blockchain evidence</p>
+    <h2 class="title">Payment verified</h2>
+    <p class="badge">VERIFIED</p>
     <p class="message">
-      This is a PROVIA verification proof. It records what the PROVIA server
-      observed on the Nimiq blockchain at verification time. It is not a
-      cryptographic certificate.
+      This is an observation record of what PROVIA saw on the Nimiq blockchain at verification time. It is not a cryptographic certificate.
     </p>
+    <p class="session">This record is for this session only. It is not stored permanently.</p>
 
     <dl>
       <div>
@@ -54,7 +65,7 @@ async function copyLink() {
       </div>
       <div>
         <dt>Recipient</dt>
-        <dd>{{ shortenNimiqAddress(proof.recipient) }}</dd>
+        <dd class="address">{{ proof.recipient }}</dd>
       </div>
       <div>
         <dt>Network</dt>
@@ -62,7 +73,7 @@ async function copyLink() {
       </div>
       <div>
         <dt>Transaction</dt>
-        <dd>{{ shortenTransactionHash(proof.transactionHash) }}</dd>
+        <dd class="hash">{{ proof.transactionHash }}</dd>
       </div>
       <div>
         <dt>Block</dt>
@@ -70,16 +81,18 @@ async function copyLink() {
       </div>
       <div>
         <dt>Confirmations</dt>
-        <dd>{{ proof.confirmationsAtVerification }}+</dd>
+        <dd>{{ proof.confirmationsAtVerification }} of {{ MIN_CONFIRMATIONS }} required</dd>
       </div>
       <div>
         <dt>Verified</dt>
-        <dd>{{ proof.verifiedAt }}</dd>
+        <dd>{{ verifiedAt }}</dd>
       </div>
     </dl>
 
-    <button type="button" class="primary" @click="copyLink">
-      {{ copied ? 'Copied' : 'Copy proof link' }}
+    <p v-if="copyError" class="error" role="alert">{{ copyError }}</p>
+
+    <button type="button" class="primary" @click="copyRecord">
+      {{ copied ? 'Copied' : 'Copy this record' }}
     </button>
     <button type="button" class="secondary" @click="emit('restart')">
       Create another payment
@@ -89,55 +102,64 @@ async function copyLink() {
 
 <style scoped>
 .receipt {
-  padding: 1.25rem 1rem 1.5rem;
-  border-radius: 0.75rem;
-  background: var(--panel);
+  background:
+    linear-gradient(180deg, rgb(62 207 159 / 10%), transparent 38%),
+    var(--record);
+  border-color: rgb(62 207 159 / 40%);
 }
 
 .eyebrow {
-  margin: 0 0 0.45rem;
-  font-size: 0.75rem;
-  font-weight: 600;
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
 .title {
-  margin: 0 0 0.45rem;
-  font-size: clamp(1.35rem, 5vw, 1.7rem);
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.35rem, 5vw, 1.75rem);
   line-height: 1.2;
+  color: var(--verified);
 }
 
-.title.positive {
-  color: var(--mint);
+.badge {
+  display: inline-block;
+  margin: 0 0 0.85rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgb(62 207 159 / 16%);
+  color: var(--verified);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
 }
 
-.verified-mark {
+.message,
+.session {
   margin: 0 0 0.75rem;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--mint);
-}
-
-.message {
-  margin: 0 0 1.15rem;
   color: var(--muted);
 }
 
+.session {
+  margin-bottom: 1.1rem;
+  font-size: 0.9rem;
+}
+
 dl {
-  margin: 0 0 1.15rem;
+  margin: 0 0 1.1rem;
 }
 
 dl div {
-  padding: 0.85rem 0;
+  padding: 0.8rem 0;
   border-bottom: 1px solid var(--line);
 }
 
 dt {
   margin: 0 0 0.25rem;
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 650;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -149,24 +171,13 @@ dd {
   overflow-wrap: anywhere;
 }
 
-button {
-  width: 100%;
-  min-height: 44px;
-  margin-top: 0.5rem;
-  border: none;
-  border-radius: 0.625rem;
-  padding: 0.625rem 0.875rem;
-  font-weight: 600;
+.address,
+.hash {
+  font-size: 0.92rem;
 }
 
-.primary {
-  background: var(--primary);
-  color: #f4f8fc;
-}
-
-.secondary {
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--line);
+.error {
+  margin: 0 0 0.75rem;
+  color: var(--danger);
 }
 </style>

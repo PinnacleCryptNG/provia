@@ -1,16 +1,20 @@
 :root {
-  --ink: #0b1220;
-  --navy: #121b2b;
-  --panel: #172234;
-  --line: #2a3a50;
-  --text: #e6edf5;
-  --muted: #9aabc0;
-  --primary: #3d73a8;
-  --mint: #7dcec4;
-  --danger: #e07a7a;
+  --ink: #0a1524;
+  --navy: #0e1726;
+  --panel: #152235;
+  --record: #101c2e;
+  --line: #2b3d55;
+  --text: #e8eef6;
+  --muted: #8fa3bb;
+  --primary: #3d86c4;
+  --verified: #3ecf9f;
+  --waiting: #e0b44f;
+  --mismatch: #e09a4a;
+  --danger: #e06b6b;
+  --submitted: #7aa7cc;
   color: var(--text);
   background: var(--navy);
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   line-height: 1.45;
   font-weight: 400;
   text-rendering: optimizeLegibility;
@@ -27,15 +31,50 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100svh;
-  background: var(--navy);
+  background:
+    radial-gradient(circle at top, #17304a 0%, transparent 42%),
+    var(--navy);
 }
 
 #app {
   min-height: 100svh;
-  background: var(--navy);
 }
 
 button,
 input {
   font: inherit;
+}
+
+.panel,
+.receipt {
+  padding: 1.15rem 1rem 1.25rem;
+  border-radius: 1rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
+button.primary,
+button.secondary {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 0.5rem;
+  border-radius: 0.7rem;
+  padding: 0.625rem 0.875rem;
+  font-weight: 650;
+}
+
+button.primary {
+  border: none;
+  background: var(--primary);
+  color: #f4f8fc;
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+
+button:disabled {
+  opacity: 0.55;
 }
