@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "{server,src}/**"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/:path*",
