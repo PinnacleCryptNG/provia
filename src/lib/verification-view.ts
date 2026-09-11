@@ -140,7 +140,7 @@ function waitingView(intent: PaymentIntent, result: VerificationResult): Verific
     kind: 'waiting',
     eyebrow: 'Observing',
     title: 'Waiting for confirmations',
-    message: 'PROVIA is independently observing the Nimiq blockchain before declaring this payment verified. Enough blockchain confirmations are still required.',
+    message: 'PROVIA is independently observing the Nimiq blockchain before declaring this payment verified. The payment does not yet have enough blockchain confirmations.',
     note: 'Verification requires 60 confirmations.',
     tone: 'waiting',
     showVerifiedLabel: false,
