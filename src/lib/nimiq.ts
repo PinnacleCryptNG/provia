@@ -138,6 +138,9 @@ export async function sendBasicNimPayment(
     transactionHash: result,
   }
 
-  console.info('[PROVIA send]', diagnostic)
+  if (import.meta.env?.DEV) {
+    console.info('[PROVIA send]', diagnostic)
+  }
+
   return diagnostic
 }

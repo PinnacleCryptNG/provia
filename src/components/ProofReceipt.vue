@@ -114,17 +114,17 @@ async function copyRecord() {
     </details>
 
     <p class="disclaimer">
-      This record reflects PROVIA's observation of the Nimiq blockchain. It is not a cryptographic certificate.
+      This is an observation record, not a cryptographic certificate.
     </p>
     <p class="session">This record is for this session only.</p>
 
     <p v-if="copyError" class="error" role="alert">{{ copyError }}</p>
 
-    <button type="button" class="primary" @click="emit('restart')">
-      Send another asset
-    </button>
-    <button type="button" class="secondary" @click="copyRecord">
+    <button type="button" class="primary" @click="copyRecord">
       {{ copied ? 'Copied' : 'Copy verification record' }}
+    </button>
+    <button type="button" class="secondary" @click="emit('restart')">
+      Send another asset
     </button>
   </section>
 </template>

@@ -6,9 +6,9 @@ defineEmits<{
 
 <template>
   <section class="hero">
-    <h2>Send an asset with confidence.</h2>
+    <h2>Independent payment verification</h2>
     <p class="lede">
-      Send through Nimiq Pay and let PROVIA independently verify the payment on-chain.
+      Send NIM in Nimiq Pay. PROVIA checks the payment on Nimiq Testnet before marking it verified.
     </p>
     <button type="button" class="primary" @click="$emit('start')">
       Send an asset

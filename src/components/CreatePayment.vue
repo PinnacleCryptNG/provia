@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { PAYMENT_PURPOSES } from '../lib/purpose'
 import type { FieldErrors } from '../lib/intent'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
-defineProps<{
+const props = defineProps<{
   errors: FieldErrors
   isCreating?: boolean
   serverError?: string | null
@@ -18,22 +18,39 @@ const emit = defineEmits<{
 }>()
 
 function submit() {
+  if (props.isCreating) {
+    return
+  }
+
   emit('review', {
     recipient: recipient.value,
     amount: amount.value,
     purpose: purpose.value,
   })
 }
+
+function revealInvalidField(errors: FieldErrors) {
+  const fieldId = errors.amount ? 'amount' : errors.recipient ? 'recipient' : null
+  if (!fieldId) {
+    return
+  }
+
+  const field = document.getElementById(fieldId)
+  field?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  field?.focus()
+}
+
+watch(() => props.errors, (errors) => {
+  revealInvalidField(errors)
+})
 </script>
 
 <template>
   <form class="panel" @submit.prevent="submit">
     <h2>Send an asset</h2>
 
-    <label for="asset">Asset</label>
-    <select id="asset" name="asset" disabled>
-      <option value="NIM" selected>NIM</option>
-    </select>
+    <p class="asset-label">Asset</p>
+    <p class="asset-value">NIM</p>
 
     <label for="amount">Amount</label>
     <span class="amount-field">
@@ -60,7 +77,7 @@ function submit() {
       autocomplete="off"
       autocapitalize="characters"
       spellcheck="false"
-      placeholder="NQ07 0000 0000 0000 0000 0000 0000 0000 0000"
+      placeholder="NQ07 0000 … 0000"
       :aria-invalid="Boolean(errors.recipient)"
     >
     <p v-if="errors.recipient" class="error" role="alert">{{ errors.recipient }}</p>
@@ -77,8 +94,13 @@ function submit() {
 
     <p v-if="serverError" class="error" role="alert">{{ serverError }}</p>
 
-    <button type="submit" class="primary" :disabled="isCreating">
-      {{ isCreating ? 'Checking details…' : 'Continue' }}
+    <button
+      type="submit"
+      class="primary"
+      :disabled="isCreating"
+      :aria-busy="isCreating"
+    >
+      {{ isCreating ? 'Checking payment details…' : 'Continue' }}
     </button>
   </form>
 </template>
@@ -90,12 +112,20 @@ h2 {
   font-weight: 700;
 }
 
-label {
+label,
+.asset-label {
   display: block;
   margin: 0 0 0.3rem;
   font-size: 0.92rem;
   font-weight: 600;
   color: var(--text);
+}
+
+.asset-value {
+  margin: 0 0 0.95rem;
+  color: var(--muted);
+  font-size: 1.02rem;
+  font-weight: 700;
 }
 
 input,
@@ -110,6 +140,14 @@ select {
   background: var(--surface-soft);
   color: var(--text);
   overflow-wrap: anywhere;
+}
+
+input[name='recipient'] {
+  font-size: 0.86rem;
+  letter-spacing: 0.01em;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .amount-field {
@@ -141,12 +179,6 @@ select {
   background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 12px) calc(50% - 3px);
   background-size: 6px 6px, 6px 6px;
   background-repeat: no-repeat;
-}
-
-select:disabled {
-  opacity: 1;
-  color: var(--text);
-  background-image: none;
 }
 
 input::placeholder {

@@ -75,8 +75,9 @@ describe('production UI copy', () => {
 
   it('keeps the homepage to a Send an asset prompt', () => {
     const source = read('src/components/HomeLanding.vue')
-    assert.match(source, /Send an asset with confidence/)
-    assert.match(source, /Send through Nimiq Pay and let PROVIA independently verify the payment on-chain/)
+    assert.match(source, /Independent payment verification/)
+    assert.match(source, /Send NIM in Nimiq Pay/)
+    assert.match(source, /Nimiq Testnet/)
     assert.match(source, />[\s]*Send an asset[\s]*</)
     assert.doesNotMatch(source, /Request a payment/)
     assert.doesNotMatch(source, /60 confirmations/)
@@ -158,6 +159,7 @@ describe('send-an-asset primary flow', () => {
     assert.match(review, /nimiqNetworkLabel\(intent\.network\)/)
     assert.match(review, /Confirm in Nimiq Pay/)
     assert.match(review, /emit\('confirm'\)/)
+    assert.match(review, /60 confirmations/)
   })
 
   it('does not send from the details-checked screen', () => {
@@ -227,5 +229,103 @@ describe('send-an-asset primary flow', () => {
     assert.match(restart, /screen\.value = 'create'/)
     assert.match(restart, /createFormKey\.value \+= 1/)
     assert.doesNotMatch(restart, /sendBasicNimPayment/)
+  })
+
+  it('locks Continue while payment details are being checked', () => {
+    const app = read('src/App.vue')
+    const create = read('src/components/CreatePayment.vue')
+    const checkFn = app.slice(
+      app.indexOf('async function checkPaymentDetails'),
+      app.indexOf('function goToReview'),
+    )
+    assert.match(checkFn, /if \(createInFlight\)/)
+    assert.match(checkFn, /createInFlight = true/)
+    assert.match(create, /Checking payment details/)
+    assert.match(create, /:disabled="isCreating"/)
+    assert.match(create, /if \(props\.isCreating\)/)
+  })
+
+  it('clears submitted payment state when returning to Send', () => {
+    const app = read('src/App.vue')
+    const backFn = app.slice(
+      app.indexOf('function backToCreate'),
+      app.indexOf('function returnToReview'),
+    )
+    assert.match(backFn, /intent\.value = null/)
+    assert.match(backFn, /flowState\.value = null/)
+    assert.match(backFn, /sendDiagnostic\.value = null/)
+    assert.match(backFn, /screen\.value = 'create'/)
+    assert.doesNotMatch(backFn, /sendBasicNimPayment/)
+    assert.doesNotMatch(backFn, /createServerIntent/)
+    assert.doesNotMatch(backFn, /createFormKey/)
+  })
+
+  it('keeps observing until 60 confirmations and offers Back to send if polling stops', () => {
+    const app = read('src/App.vue')
+    const verifying = read('src/components/VerificationPayment.vue')
+    const attempts = Number(app.match(/LIVE_MAX_OBSERVATION_ATTEMPTS = (\d+)/)?.[1])
+    assert.equal(Number.isFinite(attempts), true)
+    assert.ok(attempts >= 90, `live observation attempts should cover 60 confirmations, got ${attempts}`)
+    assert.match(app, /delayMs: DEFAULT_OBSERVATION_DELAY_MS/)
+    assert.match(verifying, /Checking the Nimiq blockchain/)
+    assert.match(verifying, /PROVIA checks the payment after 60 Nimiq confirmations/)
+    assert.match(verifying, /view\.canRetry/)
+    assert.match(verifying, /Check again/)
+    assert.match(verifying, /Back to send/)
+    assert.match(app, /@back="backToSend"/)
+    assert.doesNotMatch(verifying, /finality|cryptographic proof|certificate|trustless/i)
+  })
+
+  it('does not render the five journey dots in the live flow', () => {
+    const app = read('src/App.vue')
+    assert.doesNotMatch(app, /JourneySteps/)
+  })
+
+  it('presents NIM as information, not a selectable asset control', () => {
+    const create = read('src/components/CreatePayment.vue')
+    assert.match(create, /Asset/)
+    assert.match(create, />NIM</)
+    assert.doesNotMatch(create, /<select[^>]*id="asset"/)
+    assert.doesNotMatch(create, /<select[^>]*name="asset"/)
+  })
+
+  it('surfaces a human connect-wallet error without SDK internals', () => {
+    const app = read('src/App.vue')
+    assert.match(app, /Couldn’t connect to Nimiq Pay/)
+    assert.match(app, /Try again/)
+    assert.match(app, /CONNECT_WALLET_USER_ERROR/)
+    assert.doesNotMatch(app, /toProviderConnectionError/)
+  })
+
+  it('sanitizes create and receipt errors before showing them', () => {
+    const app = read('src/App.vue')
+    assert.match(app, /toCreatePaymentUserError/)
+    assert.match(app, /toProofUserError/)
+    assert.doesNotMatch(app, /createError\.value = error instanceof Error/)
+  })
+
+  it('makes Copy verification record the primary verified-receipt action', () => {
+    const receipt = read('src/components/ProofReceipt.vue')
+    const copyIndex = receipt.indexOf('Copy verification record')
+    const sendIndex = receipt.indexOf('Send another asset')
+    assert.ok(copyIndex > 0)
+    assert.ok(sendIndex > copyIndex)
+    assert.match(receipt, /class="primary"[^>]*>[\s\S]*Copy verification record/)
+    assert.match(receipt, /observation record, not a cryptographic certificate/)
+  })
+
+  it('keeps the send diagnostic log behind development mode', () => {
+    const nimiq = read('src/lib/nimiq.ts')
+    const logBlock = nimiq.slice(
+      nimiq.indexOf('const diagnostic: PaymentSendDiagnostic'),
+      nimiq.indexOf('return diagnostic'),
+    )
+    assert.match(logBlock, /import\.meta\.env\?\.DEV/)
+    assert.match(logBlock, /console\.info\('\[PROVIA send\]'/)
+  })
+
+  it('enables mobile safe-area viewport fitting', () => {
+    const html = read('index.html')
+    assert.match(html, /viewport-fit=cover/)
   })
 })

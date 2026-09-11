@@ -89,6 +89,7 @@ export async function observePaymentEvidence(
       intent: options.intent,
       attempt,
       maxAttempts,
+      lastResult: lastResult ?? undefined,
     })
 
     lastResult = await options.verification.verify(options.intent, hash)

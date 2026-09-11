@@ -4,7 +4,6 @@ import type { NimiqProvider } from '@nimiq/mini-app-sdk'
 import AppHeader from './components/AppHeader.vue'
 import CreatePayment from './components/CreatePayment.vue'
 import HomeLanding from './components/HomeLanding.vue'
-import JourneySteps from './components/JourneySteps.vue'
 import PaymentDetailsChecked from './components/PaymentDetailsChecked.vue'
 import ProofReceipt from './components/ProofReceipt.vue'
 import ReviewPayment from './components/ReviewPayment.vue'
@@ -25,7 +24,6 @@ import {
   initializeNimiqProvider,
   listNimiqAccounts,
   sendBasicNimPayment,
-  toProviderConnectionError,
   type PaymentSendDiagnostic,
 } from './lib/nimiq'
 import {
@@ -43,6 +41,11 @@ import {
 } from './lib/observation-service'
 import { parseNimToLuna, lunaToSafeNumber } from './lib/amount'
 import {
+  CONNECT_WALLET_USER_ERROR,
+  toCreatePaymentUserError,
+  toProofUserError,
+} from './lib/user-errors'
+import {
   DEFAULT_OBSERVATION_DELAY_MS,
   observePaymentEvidence,
   stateAfterWalletHash,
@@ -50,10 +53,9 @@ import {
 } from './lib/verification-flow'
 
 type Screen = 'home' | 'create' | 'checked' | 'review' | 'verify'
-type JourneyStep = 'create' | 'checked' | 'review' | 'observing' | 'verdict'
 
 const SUBMITTED_DWELL_MS = 1_200
-const LIVE_MAX_OBSERVATION_ATTEMPTS = 18
+const LIVE_MAX_OBSERVATION_ATTEMPTS = 180
 
 const isConnectingWallet = ref(false)
 const isProviderReady = ref(false)
@@ -81,32 +83,15 @@ const SendDiagnostic = import.meta.env.DEV
 let provider: NimiqProvider | null = null
 let observationRun = 0
 let sendInFlight = false
+let createInFlight = false
 const verificationService = createProviaApiVerificationService()
 
 const showPaymentFlow = computed(() => {
   return !proof.value && !sharedProofMissing.value
 })
 
-const journeyStep = computed<JourneyStep>(() => {
-  if (proof.value) {
-    return 'verdict'
-  }
-  if (screen.value === 'checked') {
-    return 'checked'
-  }
-  if (screen.value === 'review') {
-    return 'review'
-  }
-  if (screen.value === 'verify' && flowState.value) {
-    if (flowState.value.screen === 'submitted' || flowState.value.screen === 'checking') {
-      return 'observing'
-    }
-    if (flowState.value.result.reason === 'INSUFFICIENT_CONFIRMATIONS') {
-      return 'observing'
-    }
-    return 'verdict'
-  }
-  return 'create'
+const showConnectError = computed(() => {
+  return Boolean(initError.value) && !isProviderReady.value && !isConnectingWallet.value
 })
 
 function proofIdFromLocation(): string | null {
@@ -139,11 +124,11 @@ async function connectWallet() {
   try {
     await bindProvider()
   }
-  catch (error) {
+  catch {
     provider = null
     isProviderReady.value = false
     accountLabel.value = null
-    initError.value = toProviderConnectionError(error)
+    initError.value = CONNECT_WALLET_USER_ERROR
   }
   finally {
     isConnectingWallet.value = false
@@ -168,6 +153,10 @@ onMounted(async () => {
 })
 
 async function checkPaymentDetails(draft: PaymentDraft) {
+  if (createInFlight) {
+    return
+  }
+
   submitError.value = null
   createError.value = null
   const errors = validatePaymentDraft(draft)
@@ -183,6 +172,7 @@ async function checkPaymentDetails(draft: PaymentDraft) {
   }
 
   formErrors.value = {}
+  createInFlight = true
   isCreatingIntent.value = true
 
   try {
@@ -197,11 +187,10 @@ async function checkPaymentDetails(draft: PaymentDraft) {
     screen.value = 'checked'
   }
   catch (error) {
-    createError.value = error instanceof Error
-      ? error.message
-      : 'PROVIA could not check these payment details. Try again.'
+    createError.value = toCreatePaymentUserError(error)
   }
   finally {
+    createInFlight = false
     isCreatingIntent.value = false
   }
 }
@@ -213,10 +202,23 @@ function goToReview() {
 }
 
 function backToCreate() {
+  sendInFlight = false
+  createInFlight = false
+  observationRun += 1
   submitError.value = null
+  createError.value = null
   isSubmitting.value = false
+  isCreatingIntent.value = false
   walletOutcome.value = null
+  intent.value = null
+  flowState.value = null
+  proofError.value = null
+  sendDiagnostic.value = null
   screen.value = 'create'
+}
+
+function backToSend() {
+  backToCreate()
 }
 
 function returnToReview() {
@@ -241,9 +243,7 @@ async function issueProofIfVerified() {
     proofError.value = null
   }
   catch (error) {
-    proofError.value = error instanceof Error
-      ? error.message
-      : 'PROVIA could not create a verification record.'
+    proofError.value = toProofUserError(error)
   }
 }
 
@@ -364,6 +364,7 @@ function retryVerification() {
 
 function restart() {
   sendInFlight = false
+  createInFlight = false
   observationRun += 1
   formErrors.value = {}
   createError.value = null
@@ -372,6 +373,7 @@ function restart() {
   sharedProofMissing.value = false
   walletOutcome.value = null
   isSubmitting.value = false
+  isCreatingIntent.value = false
   intent.value = null
   flowState.value = null
   proof.value = null
@@ -391,6 +393,11 @@ function restart() {
       @connect="connectWallet"
     />
 
+    <p v-if="showConnectError" class="connect-error" role="alert">
+      Couldn’t connect to Nimiq Pay.
+      <button type="button" class="try-again" @click="connectWallet">Try again</button>
+    </p>
+
     <ProofReceipt
       v-if="proof"
       :proof="proof"
@@ -405,11 +412,6 @@ function restart() {
     </section>
 
     <template v-if="showPaymentFlow">
-      <JourneySteps
-        v-if="screen === 'checked' || screen === 'review' || screen === 'verify'"
-        :current="journeyStep"
-      />
-
       <HomeLanding
         v-if="screen === 'home'"
         @start="screen = 'create'"
@@ -447,6 +449,7 @@ function restart() {
         :state="flowState"
         @retry="retryVerification"
         @restart="restart"
+        @back="backToSend"
       />
       <component
         :is="SendDiagnostic"
@@ -463,12 +466,43 @@ function restart() {
   max-width: 26.5rem;
   width: 100%;
   margin: 0 auto;
-  padding: 1.1rem 1rem calc(1.6rem + env(safe-area-inset-bottom, 0px));
+  padding:
+    1.1rem
+    max(1rem, env(safe-area-inset-right, 0px))
+    calc(1.6rem + env(safe-area-inset-bottom, 0px))
+    max(1rem, env(safe-area-inset-left, 0px));
   overflow-wrap: anywhere;
 }
 
-.error {
+.error,
+.connect-error {
   color: var(--danger);
+}
+
+.connect-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.9rem;
+  background: rgb(208 75 75 / 8%);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.try-again {
+  width: auto;
+  min-height: 32px;
+  margin: 0;
+  border: none;
+  padding: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 h2 {

@@ -10,6 +10,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   retry: []
   restart: []
+  back: []
 }>()
 
 const view = computed(() => toVerificationView(props.state))
@@ -37,7 +38,7 @@ const showStatus = computed(() => {
 
     <p v-if="view.heroAmount && view.kind !== 'submitted'" class="amount">{{ view.heroAmount }}</p>
 
-    <p v-if="view.isChecking && !view.progress" class="checking" role="status">
+    <p v-if="view.isChecking" class="checking" role="status">
       <span class="pulse" aria-hidden="true" />
       Checking the Nimiq blockchain…
     </p>
@@ -48,6 +49,10 @@ const showStatus = computed(() => {
         <span :style="{ width: `${view.progress.percent}%` }" />
       </div>
     </div>
+
+    <p v-if="showStatus" class="confirm-hint">
+      PROVIA checks the payment after 60 Nimiq confirmations.
+    </p>
 
     <ol v-if="showStatus && view.statusSteps.length > 0" class="steps">
       <li v-for="step in view.statusSteps" :key="step.label" :data-done="step.done">
@@ -84,10 +89,10 @@ const showStatus = computed(() => {
       Check again
     </button>
     <button
-      v-if="showNotVerified"
+      v-if="showNotVerified || view.canRetry"
       type="button"
       class="secondary"
-      @click="emit('restart')"
+      @click="emit('back')"
     >
       Back to send
     </button>
@@ -164,10 +169,15 @@ const showStatus = computed(() => {
 
 .message,
 .note,
-.disclaimer {
+.disclaimer,
+.confirm-hint {
   margin: 0 0 0.85rem;
   color: var(--muted);
   font-weight: 500;
+}
+
+.confirm-hint {
+  font-size: 0.9rem;
 }
 
 .disclaimer {

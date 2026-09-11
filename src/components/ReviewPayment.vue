@@ -44,7 +44,7 @@ function confirm() {
     </dl>
 
     <p class="notice">
-      After you approve the transaction, PROVIA will independently verify that the payment matches these details.
+      After you approve the transaction, PROVIA checks it on Nimiq Testnet. We wait for 60 confirmations before marking the payment verified.
     </p>
 
     <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>

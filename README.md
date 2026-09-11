@@ -12,6 +12,30 @@ Nimiq Pay Testnet may settle `sendBasicTransactionWithData` as an HTLC payout (`
 Mini App  →  PROVIA server  →  Nimiq RPC
 ```
 
+## Judged demo (required)
+
+The reliable Cycle 2 judged demo uses **one long-lived local Node process**, not a serverless deployment.
+
+Intents, proof records, and replay protection are stored in memory on that process. That is enough for a LAN demo. It is **not** durable across Vercel serverless isolates. Separate function instances can lose intent state. Do not use a Vercel URL as the judged demo.
+
+1. On this machine:
+
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+2. Leave that process running. It starts:
+
+   - Vite Mini App on port `43123` (LAN-reachable)
+   - PROVIA verification server on port `43124`
+
+3. Vite proxies `/api` to `http://127.0.0.1:43124`, so the Mini App and API share the same long-lived server.
+
+4. In Nimiq Pay (Testnet), open the Vite **Network URL**, for example `http://192.168.1.42:43123`. Do not use `localhost` on the phone.
+
+Keep that Node process alive for the whole demo. Restarting it clears in-memory intents and proofs.
+
 ## Requirements
 
 - Node.js 22 or later
@@ -25,18 +49,16 @@ npm install
 
 ## Run locally
 
-Development has two processes:
+Development has two processes, started together by `npm run dev`:
 
 1. Vite Mini App (port `43123`, LAN-reachable)
 2. PROVIA verification server (port `43124` on this machine)
-
-Start both together:
 
 ```bash
 npm run dev
 ```
 
-Vite proxies `/api` to `http://127.0.0.1:43124`. Open the **Network URL** from Nimiq Pay, for example `http://192.168.1.42:43123`. Do not use localhost on the phone.
+Vite proxies `/api` to `http://127.0.0.1:43124`. Open the **Network URL** from Nimiq Pay.
 
 ## API
 
@@ -47,7 +69,7 @@ Vite proxies `/api` to `http://127.0.0.1:43124`. Open the **Network URL** from N
 - `GET /api/proofs/:proofId` — retrieve a stored proof
 - `GET /health`
 
-Intents and proofs are in-memory for this prototype. Restarting the server clears them.
+Intents and proofs are in-memory for this prototype. Restarting the server clears them. Vercel does not provide durable intent state.
 
 ## Load it in Nimiq Pay
 
@@ -55,7 +77,7 @@ Intents and proofs are in-memory for this prototype. Restarting the server clear
 2. Enter the Vite Network URL in Mini Apps.
 3. Send an asset. PROVIA checks and locks the payment details on the server before review.
 4. Confirm in Nimiq Pay.
-5. PROVIA independently verifies the on-chain payment. If it is verified, it issues a shareable verification record.
+5. PROVIA independently verifies the on-chain payment after 60 confirmations. If it is verified, it issues a verification record for this session.
 
 ## Tests
 
@@ -69,4 +91,4 @@ npm test
 npm run build
 ```
 
-Vercel serves the Vite build plus `api/index.ts`, which reuses `createProviaRequestListener()`. `vercel.json` rewrites `/api/*` to that function. Local `npm run dev` still uses Vite’s proxy to port `43124` and does not use the Vercel adapter.
+Vercel can serve the Vite build plus `api/index.ts`. That adapter reuses `createProviaRequestListener()`, but each serverless isolate has its own memory. Local `npm run dev` is the judged demo path: Vite’s proxy to port `43124` uses one long-lived Node server.
