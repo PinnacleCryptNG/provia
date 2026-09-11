@@ -2,18 +2,18 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
 import type { PaymentIntent } from '../src/lib/intent.ts'
-import type { NimiqNetwork } from '../src/lib/network.ts'
+import type { PaymentVerificationService } from '../src/lib/observation-service.ts'
 import type { NimIncludedObservation, NimObservationResult } from '../src/lib/observe.ts'
-import type { PaymentObservationService } from '../src/lib/observation-service.ts'
 import {
   DEFAULT_MAX_OBSERVATION_ATTEMPTS,
   DEFAULT_OBSERVATION_DELAY_MS,
+  expectedPaymentFromIntent,
   observePaymentEvidence,
   stateAfterWalletHash,
   type VerificationFlowState,
 } from '../src/lib/verification-flow.ts'
 import { toVerificationView } from '../src/lib/verification-view.ts'
-import { MIN_CONFIRMATIONS, TESTALBATROSS_NETWORK_ID } from '../src/lib/verify.ts'
+import { MIN_CONFIRMATIONS, TESTALBATROSS_NETWORK_ID, verifyPayment } from '../src/lib/verify.ts'
 
 const RECIPIENT = 'NQ61 XMNV XULY D874 G08H YDXK LK29 E7YR KFP6'
 const OTHER_RECIPIENT = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000'
@@ -60,23 +60,28 @@ function included(overrides: Partial<NimIncludedObservation> = {}): NimIncludedO
   }
 }
 
-function scriptedObservation(
+/**
+ * Test double for the PROVIA server: observe independently, then run the
+ * shared verifier. Production Mini App code does not do this in the browser.
+ */
+function scriptedVerification(
   results: NimObservationResult[],
-): PaymentObservationService & { calls: Array<{ hash: string, network: NimiqNetwork }> } {
-  const calls: Array<{ hash: string, network: NimiqNetwork }> = []
+): PaymentVerificationService & { calls: Array<{ hash: string, network: string }> } {
+  const calls: Array<{ hash: string, network: string }> = []
 
   return {
     calls,
-    async getByHash(hash, network) {
+    async verify(intent, hash) {
       const index = calls.length
-      calls.push({ hash, network })
-      return results[Math.min(index, results.length - 1)]
+      calls.push({ hash, network: intent.network })
+      const observation = results[Math.min(index, results.length - 1)]
+      return verifyPayment(expectedPaymentFromIntent(intent), observation)
     },
   }
 }
 
 async function runFlow(
-  observation: PaymentObservationService,
+  verification: PaymentVerificationService & { calls?: unknown },
   options: { intent?: PaymentIntent, maxAttempts?: number } = {},
 ): Promise<{ result: Awaited<ReturnType<typeof observePaymentEvidence>>, states: VerificationFlowState[], delays: number[] }> {
   const intent = options.intent ?? submittedIntent()
@@ -85,7 +90,7 @@ async function runFlow(
 
   const result = await observePaymentEvidence({
     intent,
-    observation,
+    verification,
     maxAttempts: options.maxAttempts ?? DEFAULT_MAX_OBSERVATION_ATTEMPTS,
     delayMs: DEFAULT_OBSERVATION_DELAY_MS,
     delay: async (ms) => {
@@ -119,8 +124,8 @@ describe('verification UI orchestration', () => {
   })
 
   it('keeps a not-found observation unresolved', async () => {
-    const observation = scriptedObservation([{ status: 'not_found', hash: HASH }])
-    const { result, delays } = await runFlow(observation)
+    const verification = scriptedVerification([{ status: 'not_found', hash: HASH }])
+    const { result, delays } = await runFlow(verification)
     const view = toVerificationView({
       screen: 'complete',
       intent: submittedIntent(),
@@ -134,13 +139,13 @@ describe('verification UI orchestration', () => {
     assert.equal(view.showVerifiedLabel, false)
     assert.equal(view.canRetry, true)
     assert.notEqual(view.title, 'Payment failed')
-    assert.equal(observation.calls.length, DEFAULT_MAX_OBSERVATION_ATTEMPTS)
+    assert.equal(verification.calls.length, DEFAULT_MAX_OBSERVATION_ATTEMPTS)
     assert.deepEqual(delays, [DEFAULT_OBSERVATION_DELAY_MS, DEFAULT_OBSERVATION_DELAY_MS])
   })
 
   it('does not verify a found transaction with insufficient confirmations', async () => {
-    const observation = scriptedObservation([included({ confirmations: MIN_CONFIRMATIONS - 1 })])
-    const { result } = await runFlow(observation)
+    const verification = scriptedVerification([included({ confirmations: MIN_CONFIRMATIONS - 1 })])
+    const { result } = await runFlow(verification)
     const view = toVerificationView({
       screen: 'complete',
       intent: submittedIntent(),
@@ -153,12 +158,12 @@ describe('verification UI orchestration', () => {
     assert.equal(view.title, 'Payment not verified yet')
     assert.equal(view.showVerifiedLabel, false)
     assert.match(view.message, /enough confirmations/)
-    assert.equal(observation.calls.length, DEFAULT_MAX_OBSERVATION_ATTEMPTS)
+    assert.equal(verification.calls.length, DEFAULT_MAX_OBSERVATION_ATTEMPTS)
   })
 
   it('renders VERIFIED only when verifyPayment returns VERIFIED', async () => {
-    const observation = scriptedObservation([included()])
-    const { result, delays } = await runFlow(observation)
+    const verification = scriptedVerification([included()])
+    const { result, delays } = await runFlow(verification)
     const view = toVerificationView({
       screen: 'complete',
       intent: submittedIntent(),
@@ -175,13 +180,13 @@ describe('verification UI orchestration', () => {
     assert.match(view.message, /confirmation requirement/)
     assert.ok(view.rows.some((row) => row.label === 'Confirmations'))
     assert.ok(view.rows.some((row) => row.label === 'Block'))
-    assert.equal(observation.calls.length, 1)
+    assert.equal(verification.calls.length, 1)
     assert.deepEqual(delays, [])
   })
 
   it('renders a wrong-recipient mismatch', async () => {
-    const observation = scriptedObservation([included({ to: OTHER_RECIPIENT })])
-    const { result } = await runFlow(observation)
+    const verification = scriptedVerification([included({ to: OTHER_RECIPIENT })])
+    const { result } = await runFlow(verification)
     const view = toVerificationView({
       screen: 'complete',
       intent: submittedIntent(),
@@ -194,12 +199,12 @@ describe('verification UI orchestration', () => {
     assert.equal(view.title, "Payment doesn't match")
     assert.match(view.message, /different address/)
     assert.equal(view.showVerifiedLabel, false)
-    assert.equal(observation.calls.length, 1)
+    assert.equal(verification.calls.length, 1)
   })
 
   it('renders underpayment with expected and observed amounts', async () => {
-    const observation = scriptedObservation([included({ valueLuna: AMOUNT_LUNA - 1 })])
-    const { result } = await runFlow(observation)
+    const verification = scriptedVerification([included({ valueLuna: AMOUNT_LUNA - 1 })])
+    const { result } = await runFlow(verification)
     const view = toVerificationView({
       screen: 'complete',
       intent: submittedIntent(),
@@ -219,8 +224,8 @@ describe('verification UI orchestration', () => {
   })
 
   it('renders overpayment as a mismatch, not verified', async () => {
-    const observation = scriptedObservation([included({ valueLuna: AMOUNT_LUNA + 1 })])
-    const { result } = await runFlow(observation)
+    const verification = scriptedVerification([included({ valueLuna: AMOUNT_LUNA + 1 })])
+    const { result } = await runFlow(verification)
     const view = toVerificationView({
       screen: 'complete',
       intent: submittedIntent(),
@@ -236,8 +241,8 @@ describe('verification UI orchestration', () => {
   })
 
   it('renders failed execution as a failed payment', async () => {
-    const observation = scriptedObservation([included({ executionResult: false })])
-    const { result } = await runFlow(observation)
+    const verification = scriptedVerification([included({ executionResult: false })])
+    const { result } = await runFlow(verification)
     const view = toVerificationView({
       screen: 'complete',
       intent: submittedIntent(),
@@ -250,18 +255,18 @@ describe('verification UI orchestration', () => {
     assert.equal(view.title, 'Payment failed')
     assert.match(view.message, /execution failed/)
     assert.equal(view.showVerifiedLabel, false)
-    assert.equal(observation.calls.length, 1)
+    assert.equal(verification.calls.length, 1)
   })
 
   it('retries observation after an unresolved state', async () => {
-    const observation = scriptedObservation([
+    const verification = scriptedVerification([
       { status: 'not_found', hash: HASH },
       { status: 'not_found', hash: HASH },
       { status: 'not_found', hash: HASH },
       included(),
     ])
 
-    const first = await runFlow(observation)
+    const first = await runFlow(verification)
     assert.equal(first.result.outcome, 'UNRESOLVED')
     assert.equal(toVerificationView({
       screen: 'complete',
@@ -269,9 +274,9 @@ describe('verification UI orchestration', () => {
       result: first.result,
     }).canRetry, true)
 
-    const retry = await runFlow(observation)
+    const retry = await runFlow(verification)
     assert.equal(retry.result.outcome, 'VERIFIED')
-    assert.equal(observation.calls.length, DEFAULT_MAX_OBSERVATION_ATTEMPTS + 1)
+    assert.equal(verification.calls.length, DEFAULT_MAX_OBSERVATION_ATTEMPTS + 1)
   })
 
   it('does not trigger wallet confirmation while observing', async () => {
@@ -281,23 +286,26 @@ describe('verification UI orchestration', () => {
       return HASH
     }
 
-    const observation = scriptedObservation([{ status: 'not_found', hash: HASH }])
-    await runFlow(observation)
+    const verification = scriptedVerification([{ status: 'not_found', hash: HASH }])
+    await runFlow(verification)
 
     assert.equal(walletCalls, 0)
     assert.equal(typeof sendBasicTransaction, 'function')
 
     const flowSource = readFileSync(new URL('../src/lib/verification-flow.ts', import.meta.url), 'utf8')
     const viewSource = readFileSync(new URL('../src/lib/verification-view.ts', import.meta.url), 'utf8')
-    assert.doesNotMatch(flowSource, /sendBasicTransaction|sendBasicNimPayment/)
+    const appSource = readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8')
+    assert.doesNotMatch(flowSource, /sendBasicTransaction|sendBasicNimPayment|getNimTransactionByHash|verifyPayment/)
     assert.doesNotMatch(viewSource, /sendBasicTransaction|sendBasicNimPayment/)
+    assert.match(appSource, /createProviaApiVerificationService/)
+    assert.doesNotMatch(appSource, /createRpcObservationService|getNimTransactionByHash/)
   })
 
-  it('passes the intent network into observation and never infers it from "Nimiq"', async () => {
-    const observation = scriptedObservation([included()])
-    await runFlow(observation)
+  it('passes the intent network into verification and never infers it from "Nimiq"', async () => {
+    const verification = scriptedVerification([included()])
+    await runFlow(verification)
 
-    assert.equal(observation.calls[0]?.network, 'NIMIQ_TESTNET')
-    assert.notEqual(observation.calls[0]?.network, 'Nimiq')
+    assert.equal(verification.calls[0]?.network, 'NIMIQ_TESTNET')
+    assert.notEqual(verification.calls[0]?.network, 'Nimiq')
   })
 })

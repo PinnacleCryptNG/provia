@@ -19,7 +19,7 @@ import {
   sendBasicNimPayment,
   toUserFacingError,
 } from './lib/nimiq'
-import { createRpcObservationService } from './lib/observation-service'
+import { createProviaApiVerificationService } from './lib/observation-service'
 import {
   observePaymentEvidence,
   stateAfterWalletHash,
@@ -41,7 +41,7 @@ const createFormKey = ref(0)
 
 let provider: NimiqProvider | null = null
 let observationRun = 0
-const observationService = createRpcObservationService()
+const verificationService = createProviaApiVerificationService()
 
 onMounted(async () => {
   try {
@@ -84,7 +84,7 @@ async function runObservation() {
   const runId = ++observationRun
   await observePaymentEvidence({
     intent: current,
-    observation: observationService,
+    verification: verificationService,
     onState(state) {
       if (runId !== observationRun) {
         return

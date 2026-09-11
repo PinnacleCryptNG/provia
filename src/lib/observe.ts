@@ -45,6 +45,7 @@ export type NimObservationResult =
 
 export type ObserveOptions = {
   rpcUrl?: string
+  fetch?: typeof globalThis.fetch
 }
 
 export function normalizeTransactionHash(input: string): string | null {
@@ -200,10 +201,11 @@ export async function getNimTransactionByHash(
   }
 
   const rpcUrl = options.rpcUrl ?? NIMIQ_TESTNET_RPC_URL
+  const fetchFn = options.fetch ?? globalThis.fetch
 
   let response: Response
   try {
-    response = await fetch(rpcUrl, {
+    response = await fetchFn(rpcUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

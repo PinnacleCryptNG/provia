@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node --experimental-strip-types scripts/dev.ts",
+    "dev:client": "vite",
+    "dev:server": "node --experimental-strip-types server/index.ts",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
     "test": "node --experimental-strip-types --test tests/*.test.ts"

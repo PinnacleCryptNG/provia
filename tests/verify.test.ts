@@ -5,7 +5,6 @@ import {
   MAINALBATROSS_NETWORK_ID,
   MIN_CONFIRMATIONS,
   TESTALBATROSS_NETWORK_ID,
-  observeAndVerifyPayment,
   verifyPayment,
   type ExpectedNimPayment,
 } from '../src/lib/verify.ts'
@@ -199,13 +198,3 @@ describe('verifyPayment', () => {
   })
 })
 
-describe('observeAndVerifyPayment', () => {
-  it('stays UNRESOLVED when independent observation cannot find the hash', async () => {
-    const result = await observeAndVerifyPayment(
-      intent(),
-      '1111111111111111111111111111111111111111111111111111111111111111',
-    )
-    assert.equal(result.outcome, 'UNRESOLVED')
-    assert.equal(result.reason, 'NOT_FOUND')
-  })
-})

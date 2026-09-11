@@ -1,11 +1,11 @@
 import type { PaymentIntent } from './intent.ts'
-import type { PaymentObservationService } from './observation-service.ts'
-import { verifyPayment, type ExpectedNimPayment, type VerificationResult } from './verify.ts'
+import type { PaymentVerificationService } from './observation-service.ts'
+import type { ExpectedNimPayment, VerificationResult } from './verify.ts'
 
-/** Small, bounded observation budget. Public Nimiq.watch RPC is rate-limited. */
+/** Small, bounded request budget. Public Nimiq.watch RPC is rate-limited. */
 export const DEFAULT_MAX_OBSERVATION_ATTEMPTS = 3
 
-/** Pause between attempts. First lookup is immediate. */
+/** Pause between client requests. First lookup is immediate. */
 export const DEFAULT_OBSERVATION_DELAY_MS = 4_000
 
 export type VerificationFlowState =
@@ -51,7 +51,7 @@ function defaultDelay(ms: number): Promise<void> {
 
 export type ObservePaymentOptions = {
   intent: PaymentIntent
-  observation: PaymentObservationService
+  verification: PaymentVerificationService
   delay?: (ms: number) => Promise<void>
   maxAttempts?: number
   delayMs?: number
@@ -59,8 +59,8 @@ export type ObservePaymentOptions = {
 }
 
 /**
- * Independently observe a submitted hash and pass each observation into
- * `verifyPayment()`. Does not send, confirm, or otherwise call the wallet.
+ * Ask the PROVIA server to observe a submitted hash. Does not send, confirm,
+ * or otherwise call the wallet, and does not run verifyPayment() locally.
  */
 export async function observePaymentEvidence(
   options: ObservePaymentOptions,
@@ -73,7 +73,6 @@ export async function observePaymentEvidence(
   const maxAttempts = options.maxAttempts ?? DEFAULT_MAX_OBSERVATION_ATTEMPTS
   const delayMs = options.delayMs ?? DEFAULT_OBSERVATION_DELAY_MS
   const delay = options.delay ?? defaultDelay
-  const expected = expectedPaymentFromIntent(options.intent)
 
   let lastResult: VerificationResult | null = null
 
@@ -85,8 +84,7 @@ export async function observePaymentEvidence(
       maxAttempts,
     })
 
-    const observation = await options.observation.getByHash(hash, options.intent.network)
-    lastResult = verifyPayment(expected, observation)
+    lastResult = await options.verification.verify(options.intent, hash)
 
     if (!isRetryableVerification(lastResult) || attempt === maxAttempts) {
       options.onState?.({

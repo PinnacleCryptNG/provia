@@ -1,6 +1,6 @@
 import { normalizeNimiqAddress } from './address.ts'
-import { expectedNetworkId, rpcUrlForNetwork, type NimiqNetwork } from './network.ts'
-import { getNimTransactionByHash, type NimIncludedObservation, type NimObservationResult, type NimTransactionKind, type ObserveOptions } from './observe.ts'
+import { expectedNetworkId, type NimiqNetwork } from './network.ts'
+import type { NimIncludedObservation, NimObservationResult, NimTransactionKind } from './observe.ts'
 
 export {
   MAINALBATROSS_NETWORK_ID,
@@ -215,15 +215,4 @@ export function verifyPayment(
     outcome: 'VERIFIED',
     reason: null,
   }
-}
-
-export async function observeAndVerifyPayment(
-  intent: ExpectedNimPayment,
-  txHash: string,
-  options?: ObserveOptions,
-): Promise<VerificationResult> {
-  const observation = await getNimTransactionByHash(txHash, {
-    rpcUrl: options?.rpcUrl ?? rpcUrlForNetwork(intent.network),
-  })
-  return verifyPayment(intent, observation)
 }
