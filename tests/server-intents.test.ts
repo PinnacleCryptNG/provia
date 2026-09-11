@@ -172,13 +172,62 @@ describe('POST /api/intents recipient preflight', () => {
     })
   })
 
+  it('does not look up a locally invalid recipient on preflight', async () => {
+    let lookups = 0
+    const rpc = createTrackedRpcObserver(() => rpcNotFound())
+    await withServer(rpc.observe, async (baseUrl) => {
+      const result = await postJson(baseUrl, '/api/preflight', {
+        recipient: 'not-an-address',
+        network: 'NIMIQ_TESTNET',
+      })
+      assert.equal(result.status, 400)
+      assert.equal(result.json.status, 'invalid')
+      assert.equal(lookups, 0)
+    }, {
+      lookupAccount: async () => {
+        lookups += 1
+        throw new Error('preflight must not look up an invalid address')
+      },
+    })
+  })
+
+  it('checks a recipient without creating a payment intent', async () => {
+    const rpc = createTrackedRpcObserver(() => rpcNotFound())
+    await withServer(rpc.observe, async (baseUrl) => {
+      const checked = await postJson(baseUrl, '/api/preflight', {
+        recipient: RECIPIENT,
+        network: 'NIMIQ_TESTNET',
+      })
+      assert.equal(checked.status, 200)
+      assert.equal(checked.json.status, 'verified')
+      assert.equal(checked.json.recipient, RECIPIENT)
+      assert.equal('accountType' in checked.json, false)
+
+      const unsupported = await postJson(baseUrl, '/api/preflight', {
+        recipient: 'NQ38 7NCU 6AMJ M6GG 18X9 PNKM YFYD 1YNJ XY09',
+        network: 'NIMIQ_TESTNET',
+      })
+      assert.equal(unsupported.json.status, 'unsupported')
+    }, {
+      lookupAccount: async (input) => ({
+        status: 'found',
+        account: {
+          address: input.address,
+          balanceLuna: 1,
+          type: input.address.includes('7NCU') ? 'htlc' : 'basic',
+        },
+        rpcUrl: 'https://rpc.testnet.nimiqwatch.com',
+      }),
+    })
+  })
+
   it('keeps wallet send from happening until a server intent exists', async () => {
     const app = await import('node:fs').then((fs) => (
       fs.readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8')
     ))
     const checkFn = app.slice(
       app.indexOf('async function checkPaymentDetails'),
-      app.indexOf('function goToReview'),
+      app.indexOf('function backToCreate'),
     )
     const confirmFn = app.slice(
       app.indexOf('async function confirmPayment'),
@@ -186,7 +235,8 @@ describe('POST /api/intents recipient preflight', () => {
     )
     assert.match(checkFn, /createServerIntent/)
     assert.doesNotMatch(checkFn, /sendBasicNimPayment/)
-    assert.match(checkFn, /screen\.value = 'checked'/)
+    assert.match(checkFn, /screen\.value = 'review'/)
+    assert.doesNotMatch(checkFn, /screen\.value = 'checked'/)
     assert.match(confirmFn, /sendBasicNimPayment/)
     assert.match(confirmFn, /isIntentId\(current\.id\)/)
   })

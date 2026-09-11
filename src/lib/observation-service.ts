@@ -2,9 +2,11 @@ import { formatLunaAsNim } from './amount.ts'
 import { isIntentId } from './ids.ts'
 import type { PaymentIntent } from './intent.ts'
 import { DEFAULT_NIMIQ_NETWORK } from './network.ts'
+import type { RecipientCheckApiResult } from './recipient-check.ts'
 import { verifyPayment, type VerificationResult } from './verify.ts'
 
 export const INTENTS_API_PATH = '/api/intents'
+export const PREFLIGHT_API_PATH = '/api/preflight'
 export const VERIFY_API_PATH = '/api/verify'
 export const PROOFS_API_PATH = '/api/proofs'
 
@@ -16,6 +18,7 @@ export type VerificationServiceOptions = {
   fetch?: typeof globalThis.fetch
   verifyUrl?: string
   intentsUrl?: string
+  preflightUrl?: string
   proofsUrl?: string
 }
 
@@ -138,6 +141,57 @@ export async function createServerIntent(
     asset: 'NIM',
     network: intent.network,
   }
+}
+
+export async function fetchRecipientPreflight(
+  recipient: string,
+  options: VerificationServiceOptions = {},
+): Promise<RecipientCheckApiResult> {
+  const fetchFn = options.fetch ?? globalThis.fetch
+  const preflightUrl = options.preflightUrl ?? PREFLIGHT_API_PATH
+
+  let response: Response
+  try {
+    response = await fetchFn(preflightUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recipient,
+        network: DEFAULT_NIMIQ_NETWORK,
+      }),
+    })
+  }
+  catch {
+    return { status: 'error' }
+  }
+
+  let payload: unknown
+  try {
+    payload = await readJson(response)
+  }
+  catch {
+    return { status: 'error' }
+  }
+
+  if (!isRecord(payload) || typeof payload.status !== 'string') {
+    return { status: 'error' }
+  }
+
+  if (payload.status === 'verified') {
+    return {
+      status: 'verified',
+      recipient: typeof payload.recipient === 'string' ? payload.recipient : undefined,
+      network: payload.network === 'NIMIQ_TESTNET' || payload.network === 'NIMIQ_MAINNET'
+        ? payload.network
+        : DEFAULT_NIMIQ_NETWORK,
+    }
+  }
+
+  if (payload.status === 'invalid' || payload.status === 'unsupported' || payload.status === 'error') {
+    return { status: payload.status }
+  }
+
+  return { status: 'error' }
 }
 
 export function paymentIntentFromServer(

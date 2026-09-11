@@ -4,7 +4,6 @@ import type { NimiqProvider } from '@nimiq/mini-app-sdk'
 import AppHeader from './components/AppHeader.vue'
 import CreatePayment from './components/CreatePayment.vue'
 import HomeLanding from './components/HomeLanding.vue'
-import PaymentDetailsChecked from './components/PaymentDetailsChecked.vue'
 import ProofReceipt from './components/ProofReceipt.vue'
 import ReviewPayment from './components/ReviewPayment.vue'
 import VerificationPayment from './components/VerificationPayment.vue'
@@ -52,7 +51,7 @@ import {
   type VerificationFlowState,
 } from './lib/verification-flow'
 
-type Screen = 'home' | 'create' | 'checked' | 'review' | 'verify'
+type Screen = 'home' | 'create' | 'review' | 'verify'
 
 const SUBMITTED_DWELL_MS = 1_200
 const LIVE_MAX_OBSERVATION_ATTEMPTS = 180
@@ -184,7 +183,7 @@ async function checkPaymentDetails(draft: PaymentDraft) {
     intent.value = paymentIntentFromServer(created, {
       purpose: purpose.length > 0 ? purpose : null,
     })
-    screen.value = 'checked'
+    screen.value = 'review'
   }
   catch (error) {
     createError.value = toCreatePaymentUserError(error)
@@ -193,12 +192,6 @@ async function checkPaymentDetails(draft: PaymentDraft) {
     createInFlight = false
     isCreatingIntent.value = false
   }
-}
-
-function goToReview() {
-  submitError.value = null
-  walletOutcome.value = null
-  screen.value = 'review'
 }
 
 function backToCreate() {
@@ -423,12 +416,6 @@ function restart() {
         :is-creating="isCreatingIntent"
         :server-error="createError"
         @review="checkPaymentDetails"
-      />
-      <PaymentDetailsChecked
-        v-if="screen === 'checked' && intent"
-        :intent="intent"
-        @back="backToCreate"
-        @review="goToReview"
       />
       <ReviewPayment
         v-if="screen === 'review' && intent && !walletOutcome"

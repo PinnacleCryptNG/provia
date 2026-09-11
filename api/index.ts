@@ -26,6 +26,7 @@ function readRewritePath(req: VercelIncoming, url: URL): string | null {
 function isProviaApiPath(pathname: string): boolean {
   return pathname === '/api/intents'
     || pathname.startsWith('/api/intents/')
+    || pathname === '/api/preflight'
     || pathname === '/api/verify'
     || pathname === '/api/proofs'
     || pathname.startsWith('/api/proofs/')

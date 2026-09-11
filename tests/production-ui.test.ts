@@ -7,13 +7,14 @@ const PRODUCTION_UI_FILES = [
   'src/components/AppHeader.vue',
   'src/components/HomeLanding.vue',
   'src/components/CreatePayment.vue',
-  'src/components/PaymentDetailsChecked.vue',
+  'src/components/RecipientCheckCard.vue',
   'src/components/ReviewPayment.vue',
   'src/components/VerificationPayment.vue',
   'src/components/ProofReceipt.vue',
   'src/components/JourneySteps.vue',
   'src/components/WalletSendOutcome.vue',
   'src/lib/verification-view.ts',
+  'src/lib/recipient-check.ts',
 ]
 
 const FORBIDDEN_PRODUCTION_COPY = [
@@ -34,7 +35,7 @@ const PRIMARY_FLOW_FILES = [
   'src/App.vue',
   'src/components/HomeLanding.vue',
   'src/components/CreatePayment.vue',
-  'src/components/PaymentDetailsChecked.vue',
+  'src/components/RecipientCheckCard.vue',
   'src/components/ReviewPayment.vue',
   'src/components/VerificationPayment.vue',
   'src/components/ProofReceipt.vue',
@@ -125,7 +126,7 @@ describe('send-an-asset primary flow', () => {
     const app = read('src/App.vue')
     const checkFn = app.slice(
       app.indexOf('async function checkPaymentDetails'),
-      app.indexOf('function goToReview'),
+      app.indexOf('function backToCreate'),
     )
     const confirmFn = app.slice(
       app.indexOf('async function confirmPayment'),
@@ -134,25 +135,33 @@ describe('send-an-asset primary flow', () => {
 
     assert.match(checkFn, /validatePaymentDraft/)
     assert.match(checkFn, /createServerIntent/)
-    assert.match(checkFn, /screen\.value = 'checked'/)
+    assert.match(checkFn, /screen\.value = 'review'/)
     assert.doesNotMatch(checkFn, /sendBasicNimPayment/)
-    assert.doesNotMatch(checkFn, /screen\.value = 'review'/)
+    assert.doesNotMatch(checkFn, /screen\.value = 'checked'/)
     assert.match(confirmFn, /sendBasicNimPayment/)
   })
 
-  it('shows Payment details checked before Review', () => {
+  it('checks the recipient on Send and skips a second details-checked screen', () => {
     const app = read('src/App.vue')
-    const checked = read('src/components/PaymentDetailsChecked.vue')
-    assert.match(app, /PaymentDetailsChecked/)
-    assert.match(app, /screen === 'checked' && intent/)
-    assert.match(checked, /Payment details checked/)
-    assert.match(checked, /PROVIA checked the payment details before you approve/)
-    assert.match(checked, /Recipient type/)
-    assert.match(checked, /Regular account/)
-    assert.match(checked, /Review your payment/)
-    assert.doesNotMatch(checked, /Payment verified/)
-    assert.doesNotMatch(checked, /intent\.id/)
-    assert.doesNotMatch(checked, /poison/i)
+    const create = read('src/components/CreatePayment.vue')
+    const card = read('src/components/RecipientCheckCard.vue')
+    assert.doesNotMatch(app, /PaymentDetailsChecked/)
+    assert.doesNotMatch(app, /screen === 'checked'/)
+    assert.match(create, /PROVIA checks your recipient before you send/)
+    assert.match(create, /inspectLocalRecipient/)
+    assert.match(create, /fetchRecipientPreflight/)
+    assert.match(create, /Checking recipient/)
+    assert.match(create, /canContinue/)
+    const adapter = read('src/lib/recipient-check.ts')
+    assert.match(adapter, /Recipient verified/)
+    assert.match(adapter, /Address is valid/)
+    assert.match(adapter, /Network: Nimiq Testnet/)
+    assert.match(adapter, /Recipient type: Supported/)
+    assert.match(card, /view\.title/)
+    assert.match(card, /view\.checks/)
+    assert.doesNotMatch(create, /poison/i)
+    assert.doesNotMatch(card, /poison|burn|HTLC|accountType/i)
+    assert.doesNotMatch(adapter, /poison|burn|HTLC|accountType|fromType|toType|Luna|RPC/i)
   })
 
   it('keeps Review on the locked intent and Confirm in Nimiq Pay as the send action', () => {
@@ -165,14 +174,15 @@ describe('send-an-asset primary flow', () => {
     assert.match(review, /nimiqNetworkLabel\(intent\.network\)/)
     assert.match(review, /Confirm in Nimiq Pay/)
     assert.match(review, /emit\('confirm'\)/)
-    assert.match(review, /60 confirmations/)
+    assert.match(review, /Recipient checked before payment/)
+    assert.match(review, /Show full address/)
   })
 
-  it('does not send from the details-checked screen', () => {
-    const checked = read('src/components/PaymentDetailsChecked.vue')
+  it('does not send from the Send screen', () => {
+    const create = read('src/components/CreatePayment.vue')
     const app = read('src/App.vue')
-    assert.doesNotMatch(checked, /sendBasicNimPayment|Confirm in Nimiq Pay/)
-    assert.match(app, /@review="goToReview"/)
+    assert.doesNotMatch(create, /sendBasicNimPayment|Confirm in Nimiq Pay/)
+    assert.match(app, /@review="checkPaymentDetails"/)
     assert.match(app, /@confirm="confirmPayment"/)
   })
 
@@ -242,13 +252,14 @@ describe('send-an-asset primary flow', () => {
     const create = read('src/components/CreatePayment.vue')
     const checkFn = app.slice(
       app.indexOf('async function checkPaymentDetails'),
-      app.indexOf('function goToReview'),
+      app.indexOf('function backToCreate'),
     )
     assert.match(checkFn, /if \(createInFlight\)/)
     assert.match(checkFn, /createInFlight = true/)
     assert.match(create, /Checking payment details/)
-    assert.match(create, /:disabled="isCreating"/)
-    assert.match(create, /if \(props\.isCreating\)/)
+    assert.match(create, /Checking recipient/)
+    assert.match(create, /:disabled="!canContinue"/)
+    assert.match(create, /if \(props\.isCreating \|\| !canContinue\.value\)/)
   })
 
   it('clears submitted payment state when returning to Send', () => {

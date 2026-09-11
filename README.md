@@ -4,7 +4,7 @@ PROVIA is a Nimiq Pay Mini App for independent payment verification.
 
 A successful wallet submission is not proof of payment. PROVIA checks Nimiq blockchain evidence independently, then issues a verification record only when the payment matches and has 60 confirmations.
 
-The Mini App creates a **server-owned payment intent**. Continue first checks the recipient on the selected Nimiq network, then stores the canonical recipient, amount, network, and intent ID. After Nimiq Pay returns a transaction hash, the Mini App sends only `intentId` and `transactionHash`. The server looks up the stored intent, independently observes the Nimiq chain, and runs the shared `verifyPayment()` engine. A **PROVIA verification proof** is issued only when that engine returns `VERIFIED`.
+The Mini App checks the destination as soon as a recipient is entered. That preflight answers whether the address is a supported Nimiq Testnet destination **before** Review. Continue then creates a **server-owned payment intent** with the exact recipient, amount, network, and intent ID. After Nimiq Pay returns a transaction hash, the Mini App sends only `intentId` and `transactionHash`. The server looks up the stored intent, independently observes the Nimiq chain, and runs the shared `verifyPayment()` engine. A **PROVIA verification proof** is issued only when that engine returns `VERIFIED`. Preflight is not payment verification.
 
 Recipient preflight uses `getAccountByAddress` on that network’s RPC:
 
@@ -71,6 +71,7 @@ Vite proxies `/api` to `http://127.0.0.1:43124`. Open the **Network URL** from N
 
 ## API
 
+- `POST /api/preflight` — check a recipient without creating an intent
 - `POST /api/intents` — create a server-owned intent (`pi_…`)
 - `GET /api/intents/:intentId` — retrieve the stored intent
 - `POST /api/verify` — `{ intentId, transactionHash }`
@@ -84,7 +85,7 @@ Intents and proofs are in-memory for this prototype. Restarting the server clear
 
 1. Open Nimiq Pay on Testnet.
 2. Enter the Vite Network URL in Mini Apps.
-3. Send NIM. PROVIA checks the recipient and locks the payment details on the server before review.
+3. Send NIM. PROVIA checks the recipient on the Send screen, then locks the payment details on the server before Review.
 4. Confirm in Nimiq Pay.
 5. PROVIA independently verifies the on-chain payment after 60 confirmations. If it is verified, it issues a verification record for this session.
 

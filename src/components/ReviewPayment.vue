@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { shortenNimiqAddress } from '../lib/address'
 import type { PaymentIntent } from '../lib/intent'
 import { nimiqNetworkLabel } from '../lib/network'
@@ -13,6 +14,8 @@ const emit = defineEmits<{
   back: []
   confirm: []
 }>()
+
+const showFullRecipient = ref(false)
 
 function confirm() {
   if (props.isSubmitting) {
@@ -32,7 +35,10 @@ function confirm() {
       <div>
         <dt>To</dt>
         <dd class="address">{{ shortenNimiqAddress(intent.recipient) }}</dd>
-        <dd class="address-full">{{ intent.recipient }}</dd>
+        <button type="button" class="link" @click="showFullRecipient = !showFullRecipient">
+          {{ showFullRecipient ? 'Hide full address' : 'Show full address' }}
+        </button>
+        <dd v-if="showFullRecipient" class="address-full">{{ intent.recipient }}</dd>
       </div>
       <div v-if="intent.purpose">
         <dt>Purpose</dt>
@@ -45,7 +51,8 @@ function confirm() {
     </dl>
 
     <p class="notice">
-      PROVIA already checked these details. After you approve, it verifies that this recipient actually received the payment. We wait for 60 confirmations before marking the payment verified.
+      <span aria-hidden="true">✓</span>
+      Recipient checked before payment
     </p>
 
     <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
@@ -115,20 +122,40 @@ dd {
 }
 
 .address-full {
-  margin-top: 0.35rem;
+  margin-top: 0.45rem;
   font-size: 0.82rem;
   font-weight: 600;
   color: var(--muted);
 }
 
+.link {
+  width: auto;
+  min-height: 32px;
+  margin: 0.35rem 0 0;
+  border: none;
+  padding: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .notice {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
   margin: 0 0 1rem;
-  padding: 0.9rem 0.95rem;
+  padding: 0.75rem 0.9rem;
   border-radius: 0.95rem;
-  background: rgb(5 130 202 / 8%);
+  background: rgb(26 163 106 / 8%);
   color: var(--text);
   font-size: 0.95rem;
   font-weight: 600;
+}
+
+.notice span {
+  color: var(--verified);
 }
 
 .error {

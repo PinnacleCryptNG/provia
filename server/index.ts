@@ -6,10 +6,12 @@ import {
   createIntentStore,
   expectedPaymentFromStoredIntent,
   parseCreateIntentRequest,
+  parsePreflightRequest,
   publicIntent,
   type IntentStore,
 } from './intents.ts'
 import { createNimiqAccountLookup, type LookupAccount } from '../src/lib/account.ts'
+import { recipientCheckFromPreflight } from '../src/lib/recipient-check.ts'
 import { runRecipientPreflight } from '../src/lib/recipient-preflight.ts'
 import { createNimiqRpcObserver, type ObserveTransaction } from './observation.ts'
 import {
@@ -124,6 +126,30 @@ export function createProviaRequestListener(options: {
 
     if (req.method === 'GET' && pathname === '/health') {
       json(res, 200, { ok: true, service: 'provia-verify' })
+      return
+    }
+
+    if (req.method === 'POST' && pathname === '/api/preflight') {
+      let body: unknown
+      try {
+        body = await readBody(req)
+      }
+      catch (error) {
+        json(res, 400, { error: error instanceof Error ? error.message : 'Invalid request body.' })
+        return
+      }
+
+      const parsed = parsePreflightRequest(body)
+      if (!parsed.ok) {
+        json(res, 400, { status: 'invalid', error: parsed.error })
+        return
+      }
+
+      const preflight = await runRecipientPreflight({
+        recipient: parsed.recipient,
+        network: parsed.network,
+      }, lookupAccount)
+      json(res, 200, recipientCheckFromPreflight(preflight))
       return
     }
 

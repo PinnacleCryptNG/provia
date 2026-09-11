@@ -83,6 +83,33 @@ export type ParsedCreateIntent =
   | { ok: true, intent: PublicIntent }
   | { ok: false, error: string }
 
+export type ParsedPreflightRequest =
+  | { ok: true, recipient: string, network: PublicIntent['network'] }
+  | { ok: false, error: string }
+
+export function parsePreflightRequest(body: unknown): ParsedPreflightRequest {
+  if (!isRecord(body)) {
+    return { ok: false, error: 'Request body must be a JSON object.' }
+  }
+
+  const recipient = readString(body.recipient)
+  const network = readString(body.network) ?? 'NIMIQ_TESTNET'
+
+  if (!recipient || !isValidNimiqAddress(recipient)) {
+    return { ok: false, error: 'Enter a valid Nimiq recipient address.' }
+  }
+
+  if (!isNimiqNetwork(network)) {
+    return { ok: false, error: 'network must be NIMIQ_TESTNET or NIMIQ_MAINNET.' }
+  }
+
+  return {
+    ok: true,
+    recipient: normalizeNimiqAddress(recipient),
+    network,
+  }
+}
+
 export function parseCreateIntentRequest(body: unknown): ParsedCreateIntent {
   if (!isRecord(body)) {
     return { ok: false, error: 'Request body must be a JSON object.' }

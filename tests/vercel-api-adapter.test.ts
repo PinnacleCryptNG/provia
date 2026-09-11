@@ -108,6 +108,20 @@ describe('Vercel API adapter', () => {
     })
   })
 
+  it('exposes POST /api/preflight through the Vercel adapter', async () => {
+    const rpc = createTrackedRpcObserver(() => rpcNotFound())
+    await withAdapter(rpc.observe, async (baseUrl) => {
+      const { status, json } = await postJson(baseUrl, '/api/preflight', {
+        recipient: INTENT_DRAFT.recipient,
+        network: 'NIMIQ_TESTNET',
+      })
+      assert.equal(status, 200)
+      assert.equal(json.status, 'verified')
+      assert.equal(json.recipient, INTENT_DRAFT.recipient)
+      assert.equal('accountType' in json, false)
+    })
+  })
+
   it('maps rewrite query and forwarded URI to /api/intents', () => {
     const rewritten = { url: '/api?__path=intents' } as IncomingMessage
     assert.equal(proviaApiUrl(rewritten).startsWith('/api/intents'), true)
