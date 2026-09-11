@@ -25,7 +25,7 @@ npm install
 
 Development has two processes:
 
-1. Vite Mini App (port `5173`, LAN-reachable)
+1. Vite Mini App (port `43123`, LAN-reachable)
 2. PROVIA verification server (port `43124` on this machine)
 
 Start both together:
@@ -34,7 +34,7 @@ Start both together:
 npm run dev
 ```
 
-Vite proxies `/api` to `http://127.0.0.1:43124`. Open the **Network URL** from Nimiq Pay, for example `http://192.168.1.42:5173`. Do not use localhost on the phone.
+Vite proxies `/api` to `http://127.0.0.1:43124`. Open the **Network URL** from Nimiq Pay, for example `http://192.168.1.42:43123`. Do not use localhost on the phone.
 
 ## API
 

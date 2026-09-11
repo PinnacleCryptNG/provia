@@ -6,7 +6,9 @@ const serverPort = Number(process.env.PROVIA_SERVER_PORT ?? 43124)
 export default defineConfig({
   plugins: [vue()],
   server: {
-    port: 5173,
+    // Uncommon port: Cursor Cloud Preview does not reliably tunnel Vite's default 5173.
+    port: 43123,
+    strictPort: true,
     host: true,
     proxy: {
       '/api': {
