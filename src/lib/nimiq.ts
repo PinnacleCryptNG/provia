@@ -71,7 +71,7 @@ export function toUserFacingError(error: unknown): string {
 }
 
 export function toProviderConnectionError(_error: unknown): string {
-  return 'PROVIA could not connect to Nimiq Pay. Open this Mini App inside Nimiq Pay to submit a payment.'
+  return 'PROVIA could not connect to Nimiq Pay. Open this Mini App inside Nimiq Pay. A browser window cannot submit a payment.'
 }
 
 export async function listNimiqAccounts(provider: NimiqProvider): Promise<string[]> {

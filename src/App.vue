@@ -325,8 +325,7 @@ function restart() {
 
     <template v-if="showPaymentFlow">
       <section v-if="!isProviderReady" class="banner" role="alert">
-        <p>Open this Mini App inside Nimiq Pay. A browser window cannot submit a payment.</p>
-        <p v-if="initError" class="error">{{ initError }}</p>
+        <p>{{ initError ?? 'Open this Mini App inside Nimiq Pay. A browser window cannot submit a payment.' }}</p>
       </section>
 
       <JourneySteps :current="journeyStep" />
