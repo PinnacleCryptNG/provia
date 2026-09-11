@@ -96,4 +96,29 @@ describe('Payment intent creation', () => {
     })
     assert.equal(zeroAmount.amount, 'Amount must be greater than zero.')
   })
+
+  it('does not continue with an invalid recipient or an empty amount', () => {
+    const invalidRecipient = validatePaymentDraft({
+      recipient: 'not-an-address',
+      amount: '1',
+      purpose: '',
+    })
+    assert.equal(invalidRecipient.recipient, 'Enter a valid Nimiq address.')
+    assert.equal(invalidRecipient.amount, undefined)
+
+    const emptyAmount = validatePaymentDraft({
+      recipient: VALID_ADDRESS,
+      amount: '',
+      purpose: 'Invoice',
+    })
+    assert.equal(emptyAmount.amount, 'Enter an amount.')
+    assert.equal(emptyAmount.recipient, undefined)
+
+    const valid = validatePaymentDraft({
+      recipient: VALID_ADDRESS,
+      amount: '1',
+      purpose: '',
+    })
+    assert.deepEqual(valid, {})
+  })
 })

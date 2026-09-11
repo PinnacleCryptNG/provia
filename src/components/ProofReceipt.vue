@@ -124,7 +124,7 @@ async function copyRecord() {
       {{ copied ? 'Copied' : 'Copy verification record' }}
     </button>
     <button type="button" class="secondary" @click="emit('restart')">
-      Request another payment
+      Send an asset
     </button>
   </section>
 </template>

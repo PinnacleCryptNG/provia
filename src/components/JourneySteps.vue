@@ -1,10 +1,10 @@
 <script setup lang="ts">
-type StepId = 'create' | 'review' | 'submitted' | 'observing' | 'verdict'
+type StepId = 'create' | 'checked' | 'review' | 'observing' | 'verdict'
 
 const STEPS: { id: StepId, label: string }[] = [
-  { id: 'create', label: 'Request' },
+  { id: 'create', label: 'Send' },
+  { id: 'checked', label: 'Check' },
   { id: 'review', label: 'Review' },
-  { id: 'submitted', label: 'Sent' },
   { id: 'observing', label: 'Verify' },
   { id: 'verdict', label: 'Done' },
 ]

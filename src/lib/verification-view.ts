@@ -162,7 +162,7 @@ export function submittedView(intent: PaymentIntent): VerificationViewModel {
     kind: 'submitted',
     eyebrow: 'Submitted',
     title: 'Payment submitted',
-    message: 'Your payment was submitted. PROVIA is checking the Nimiq blockchain now.',
+    message: 'Nimiq Pay accepted the transaction. PROVIA is now checking the Nimiq blockchain.',
     note: null,
     tone: 'neutral',
     showVerifiedLabel: false,

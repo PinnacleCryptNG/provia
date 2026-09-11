@@ -114,7 +114,7 @@ describe('verification UI orchestration', () => {
     assert.equal(view.title, 'Payment submitted')
     assert.equal(
       view.message,
-      'Your payment was submitted. PROVIA is checking the Nimiq blockchain now.',
+      'Nimiq Pay accepted the transaction. PROVIA is now checking the Nimiq blockchain.',
     )
     assert.equal(view.note, null)
     assert.equal(view.showVerifiedLabel, false)

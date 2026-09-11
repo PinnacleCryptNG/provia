@@ -5,6 +5,7 @@ import AppHeader from './components/AppHeader.vue'
 import CreatePayment from './components/CreatePayment.vue'
 import HomeLanding from './components/HomeLanding.vue'
 import JourneySteps from './components/JourneySteps.vue'
+import PaymentDetailsChecked from './components/PaymentDetailsChecked.vue'
 import ProofReceipt from './components/ProofReceipt.vue'
 import ReviewPayment from './components/ReviewPayment.vue'
 import VerificationPayment from './components/VerificationPayment.vue'
@@ -44,8 +45,8 @@ import {
   type VerificationFlowState,
 } from './lib/verification-flow'
 
-type Screen = 'home' | 'create' | 'review' | 'verify'
-type JourneyStep = 'create' | 'review' | 'submitted' | 'observing' | 'verdict'
+type Screen = 'home' | 'create' | 'checked' | 'review' | 'verify'
+type JourneyStep = 'create' | 'checked' | 'review' | 'observing' | 'verdict'
 
 const SUBMITTED_DWELL_MS = 1_200
 const LIVE_MAX_OBSERVATION_ATTEMPTS = 18
@@ -84,14 +85,14 @@ const journeyStep = computed<JourneyStep>(() => {
   if (proof.value) {
     return 'verdict'
   }
+  if (screen.value === 'checked') {
+    return 'checked'
+  }
   if (screen.value === 'review') {
     return 'review'
   }
   if (screen.value === 'verify' && flowState.value) {
-    if (flowState.value.screen === 'submitted') {
-      return 'submitted'
-    }
-    if (flowState.value.screen === 'checking') {
+    if (flowState.value.screen === 'submitted' || flowState.value.screen === 'checking') {
       return 'observing'
     }
     if (flowState.value.result.reason === 'INSUFFICIENT_CONFIRMATIONS') {
@@ -158,7 +159,7 @@ onMounted(async () => {
   await connectWallet()
 })
 
-async function reviewPayment(draft: PaymentDraft) {
+async function checkPaymentDetails(draft: PaymentDraft) {
   submitError.value = null
   createError.value = null
   const errors = validatePaymentDraft(draft)
@@ -185,22 +186,33 @@ async function reviewPayment(draft: PaymentDraft) {
     intent.value = paymentIntentFromServer(created, {
       purpose: purpose.length > 0 ? purpose : null,
     })
-    screen.value = 'review'
+    screen.value = 'checked'
   }
   catch (error) {
     createError.value = error instanceof Error
       ? error.message
-      : 'PROVIA could not create the payment request. Try again.'
+      : 'PROVIA could not check these payment details. Try again.'
   }
   finally {
     isCreatingIntent.value = false
   }
 }
 
+function goToReview() {
+  submitError.value = null
+  screen.value = 'review'
+}
+
 function backToCreate() {
   submitError.value = null
   isSubmitting.value = false
   screen.value = 'create'
+}
+
+function backToChecked() {
+  submitError.value = null
+  isSubmitting.value = false
+  screen.value = 'checked'
 }
 
 async function issueProofIfVerified() {
@@ -251,7 +263,7 @@ async function runObservation() {
 
 async function confirmPayment() {
   if (!intent.value || !isIntentId(intent.value.id)) {
-    submitError.value = 'This payment request is incomplete. Go back and create it again.'
+    submitError.value = 'This payment is incomplete. Go back and send it again.'
     return
   }
 
@@ -332,7 +344,7 @@ function restart() {
       <h2>Record not available</h2>
       <p class="error">{{ proofError }}</p>
       <p>Verification records are kept for this session only.</p>
-      <button type="button" class="primary" @click="restart">Request a payment</button>
+      <button type="button" class="primary" @click="restart">Send an asset</button>
     </section>
 
     <template v-if="showPaymentFlow">
@@ -341,7 +353,7 @@ function restart() {
       </section>
 
       <JourneySteps
-        v-if="screen === 'review' || screen === 'verify'"
+        v-if="screen === 'checked' || screen === 'review' || screen === 'verify'"
         :current="journeyStep"
       />
 
@@ -355,14 +367,20 @@ function restart() {
         :errors="formErrors"
         :is-creating="isCreatingIntent"
         :server-error="createError"
-        @review="reviewPayment"
+        @review="checkPaymentDetails"
+      />
+      <PaymentDetailsChecked
+        v-if="screen === 'checked' && intent"
+        :intent="intent"
+        @back="backToCreate"
+        @review="goToReview"
       />
       <ReviewPayment
         v-if="screen === 'review' && intent"
         :intent="intent"
         :is-submitting="isSubmitting"
         :error-message="submitError"
-        @back="backToCreate"
+        @back="backToChecked"
         @confirm="confirmPayment"
       />
       <VerificationPayment

@@ -53,9 +53,9 @@ Intents and proofs are in-memory for this prototype. Restarting the server clear
 
 1. Open Nimiq Pay on Testnet.
 2. Enter the Vite Network URL in Mini Apps.
-3. Create a payment. PROVIA stores the intent on the server before review.
+3. Send an asset. PROVIA checks and locks the payment details on the server before review.
 4. Confirm in Nimiq Pay.
-5. PROVIA verifies against the chain. If the payment is verified, it issues a shareable proof receipt.
+5. PROVIA independently verifies the on-chain payment. If it is verified, it issues a shareable verification record.
 
 ## Tests
 

@@ -89,7 +89,7 @@ const showStatus = computed(() => {
       :class="view.canRetry || view.showVerifiedLabel || showNotVerified ? 'secondary' : 'primary'"
       @click="emit('restart')"
     >
-      Request another payment
+      Send an asset
     </button>
   </section>
 </template>

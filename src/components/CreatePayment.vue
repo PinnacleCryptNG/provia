@@ -28,7 +28,12 @@ function submit() {
 
 <template>
   <form class="panel" @submit.prevent="submit">
-    <h2>Request a payment</h2>
+    <h2>Send an asset</h2>
+
+    <label for="asset">Asset</label>
+    <select id="asset" name="asset" disabled>
+      <option value="NIM" selected>NIM</option>
+    </select>
 
     <label for="amount">Amount</label>
     <span class="amount-field">
@@ -73,7 +78,7 @@ function submit() {
     <p v-if="serverError" class="error" role="alert">{{ serverError }}</p>
 
     <button type="submit" class="primary" :disabled="isCreating">
-      {{ isCreating ? 'Creating request…' : 'Continue' }}
+      {{ isCreating ? 'Checking details…' : 'Continue' }}
     </button>
   </form>
 </template>
@@ -136,6 +141,12 @@ select {
   background-position: calc(100% - 18px) calc(50% - 3px), calc(100% - 12px) calc(50% - 3px);
   background-size: 6px 6px, 6px 6px;
   background-repeat: no-repeat;
+}
+
+select:disabled {
+  opacity: 1;
+  color: var(--text);
+  background-image: none;
 }
 
 input::placeholder {

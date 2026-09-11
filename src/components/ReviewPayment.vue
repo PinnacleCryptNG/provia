@@ -17,7 +17,7 @@ const emit = defineEmits<{
 
 <template>
   <section class="panel">
-    <h2>Review payment</h2>
+    <h2>Review your payment</h2>
     <p class="amount">{{ intent.amountNim }} NIM</p>
 
     <dl>
@@ -36,7 +36,7 @@ const emit = defineEmits<{
     </dl>
 
     <p class="notice">
-      PROVIA will independently verify this payment on the Nimiq blockchain after you submit it.
+      After you approve the transaction, PROVIA will independently verify that the payment matches these details.
     </p>
 
     <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
