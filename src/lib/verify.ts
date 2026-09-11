@@ -1,14 +1,11 @@
 import { normalizeNimiqAddress } from './address.ts'
+import { expectedNetworkId, rpcUrlForNetwork, type NimiqNetwork } from './network.ts'
 import { getNimTransactionByHash, type NimIncludedObservation, type NimObservationResult, type NimTransactionKind, type ObserveOptions } from './observe.ts'
 
-/**
- * TestAlbatross `networkId` observed on testnet RPC transactions
- * (`getLatestBlock.network === "TestAlbatross"`).
- */
-export const TESTALBATROSS_NETWORK_ID = 5
-
-/** MainAlbatross `networkId` observed on mainnet RPC transactions. */
-export const MAINALBATROSS_NETWORK_ID = 24
+export {
+  MAINALBATROSS_NETWORK_ID,
+  TESTALBATROSS_NETWORK_ID,
+} from './network.ts'
 
 /**
  * Conservative Testnet inclusion depth: one Albatross batch
@@ -21,7 +18,7 @@ export type ExpectedNimPayment = {
   recipient: string
   amountLuna: number
   asset: string
-  network: string
+  network: NimiqNetwork
 }
 
 export type VerificationOutcome =
@@ -58,6 +55,7 @@ export type VerificationResult = {
   observedKind: NimTransactionKind | null
   transactionHash: string | null
   sender: string | null
+  observedBlockNumber: number | null
 }
 
 function integerLuna(value: number): bigint {
@@ -80,6 +78,7 @@ function baseResult(intent: ExpectedNimPayment): Omit<VerificationResult, 'outco
     observedKind: null,
     transactionHash: null,
     sender: null,
+    observedBlockNumber: null,
   }
 }
 
@@ -98,6 +97,7 @@ function withObservation(
     observedKind: observation.kind,
     transactionHash: observation.hash,
     sender: observation.from,
+    observedBlockNumber: observation.blockNumber,
   }
 }
 
@@ -150,7 +150,7 @@ export function verifyPayment(
     }
   }
 
-  if (observation.networkId !== TESTALBATROSS_NETWORK_ID) {
+  if (observation.networkId !== expectedNetworkId(intent.network)) {
     return {
       ...observed,
       outcome: 'MISMATCH',
@@ -222,6 +222,8 @@ export async function observeAndVerifyPayment(
   txHash: string,
   options?: ObserveOptions,
 ): Promise<VerificationResult> {
-  const observation = await getNimTransactionByHash(txHash, options)
+  const observation = await getNimTransactionByHash(txHash, {
+    rpcUrl: options?.rpcUrl ?? rpcUrlForNetwork(intent.network),
+  })
   return verifyPayment(intent, observation)
 }

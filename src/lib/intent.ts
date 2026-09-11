@@ -1,8 +1,8 @@
 import { isValidNimiqAddress, normalizeNimiqAddress } from './address.ts'
 import { formatLunaAsNim, lunaToSafeNumber, parseNimToLuna } from './amount.ts'
+import { DEFAULT_NIMIQ_NETWORK, type NimiqNetwork } from './network.ts'
 
 export type PaymentAsset = 'NIM'
-export type PaymentNetwork = 'Nimiq'
 export type PaymentStatus = 'created' | 'submitted' | 'rejected' | 'failed'
 
 export type PaymentIntent = {
@@ -11,7 +11,7 @@ export type PaymentIntent = {
   amountNim: string
   amountLuna: number
   asset: PaymentAsset
-  network: PaymentNetwork
+  network: NimiqNetwork
   purpose: string | null
   createdAt: string
   status: PaymentStatus
@@ -89,7 +89,7 @@ export function createPaymentIntent(draft: PaymentDraft): IntentCreateResult {
       amountNim: formatLunaAsNim(parsedAmount.luna),
       amountLuna: lunaToSafeNumber(parsedAmount.luna),
       asset: 'NIM',
-      network: 'Nimiq',
+      network: DEFAULT_NIMIQ_NETWORK,
       purpose: purpose.length > 0 ? purpose : null,
       createdAt: new Date().toISOString(),
       status: 'created',

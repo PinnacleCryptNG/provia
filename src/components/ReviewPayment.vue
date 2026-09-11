@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PaymentIntent } from '../lib/intent'
 import { shortenNimiqAddress } from '../lib/address'
+import { nimiqNetworkLabel } from '../lib/network'
 
 defineProps<{
   intent: PaymentIntent
@@ -30,7 +31,7 @@ const emit = defineEmits<{
       </div>
       <div>
         <dt>Network</dt>
-        <dd>{{ intent.network }}</dd>
+        <dd>{{ nimiqNetworkLabel(intent.network) }}</dd>
       </div>
       <div v-if="intent.purpose">
         <dt>Purpose</dt>

@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
 import CreatePayment from './components/CreatePayment.vue'
 import ReviewPayment from './components/ReviewPayment.vue'
-import ProcessingPayment from './components/ProcessingPayment.vue'
+import VerificationPayment from './components/VerificationPayment.vue'
 import {
   createPaymentIntent,
   withFailedStatus,
@@ -19,8 +19,14 @@ import {
   sendBasicNimPayment,
   toUserFacingError,
 } from './lib/nimiq'
+import { createRpcObservationService } from './lib/observation-service'
+import {
+  observePaymentEvidence,
+  stateAfterWalletHash,
+  type VerificationFlowState,
+} from './lib/verification-flow'
 
-type Screen = 'create' | 'review' | 'processing'
+type Screen = 'create' | 'review' | 'verify'
 
 const isInitializing = ref(true)
 const isProviderReady = ref(false)
@@ -30,9 +36,12 @@ const submitError = ref<string | null>(null)
 const isSubmitting = ref(false)
 const screen = ref<Screen>('create')
 const intent = ref<PaymentIntent | null>(null)
+const flowState = ref<VerificationFlowState | null>(null)
 const createFormKey = ref(0)
 
 let provider: NimiqProvider | null = null
+let observationRun = 0
+const observationService = createRpcObservationService()
 
 onMounted(async () => {
   try {
@@ -66,6 +75,25 @@ function backToCreate() {
   screen.value = 'create'
 }
 
+async function runObservation() {
+  const current = intent.value
+  if (!current?.transactionHash) {
+    return
+  }
+
+  const runId = ++observationRun
+  await observePaymentEvidence({
+    intent: current,
+    observation: observationService,
+    onState(state) {
+      if (runId !== observationRun) {
+        return
+      }
+      flowState.value = state
+    },
+  })
+}
+
 async function confirmPayment() {
   if (!intent.value) {
     submitError.value = 'No payment intent to confirm.'
@@ -85,8 +113,13 @@ async function confirmPayment() {
       recipient: intent.value.recipient,
       valueLuna: intent.value.amountLuna,
     })
-    intent.value = withSubmittedHash(intent.value, transactionHash)
-    screen.value = 'processing'
+    const submitted = withSubmittedHash(intent.value, transactionHash)
+    intent.value = submitted
+    flowState.value = stateAfterWalletHash(submitted)
+    screen.value = 'verify'
+    queueMicrotask(() => {
+      void runObservation()
+    })
   }
   catch (error) {
     intent.value = isUserRejection(error)
@@ -99,10 +132,16 @@ async function confirmPayment() {
   }
 }
 
+function retryVerification() {
+  void runObservation()
+}
+
 function restart() {
+  observationRun += 1
   formErrors.value = {}
   submitError.value = null
   intent.value = null
+  flowState.value = null
   createFormKey.value += 1
   screen.value = 'create'
 }
@@ -111,9 +150,12 @@ function restart() {
 <template>
   <main class="app">
     <header>
-      <p class="eyebrow">Nimiq Pay Mini App</p>
+      <p class="eyebrow">Payment verification</p>
       <h1>PROVIA</h1>
-      <p class="lede">Create a NIM payment intent, review it, then approve it in Nimiq Pay.</p>
+      <p class="lede">
+        Create a NIM payment intent, submit it through Nimiq Pay, then verify it
+        against independent blockchain evidence.
+      </p>
       <p v-if="isProviderReady" class="connected">Nimiq Pay connected</p>
     </header>
 
@@ -149,9 +191,10 @@ function restart() {
         @back="backToCreate"
         @confirm="confirmPayment"
       />
-      <ProcessingPayment
-        v-if="screen === 'processing' && intent"
-        :intent="intent"
+      <VerificationPayment
+        v-if="screen === 'verify' && flowState"
+        :state="flowState"
+        @retry="retryVerification"
         @restart="restart"
       />
     </template>
@@ -166,7 +209,7 @@ function restart() {
 }
 
 header {
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
 }
 
 .eyebrow {

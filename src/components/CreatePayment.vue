@@ -28,6 +28,7 @@ function submit() {
   <form class="panel" @submit.prevent="submit">
     <h2>Create payment</h2>
     <p class="hint">Describe the NIM payment you intend to send. Nothing is submitted until you confirm it.</p>
+    <p class="network">Network: Nimiq Testnet</p>
 
     <label>
       Recipient
@@ -88,7 +89,13 @@ h2 {
 }
 
 .hint {
+  margin: 0 0 0.55rem;
+  color: var(--muted);
+}
+
+.network {
   margin: 0 0 1rem;
+  font-size: 0.9rem;
   color: var(--muted);
 }
 

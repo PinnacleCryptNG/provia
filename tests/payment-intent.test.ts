@@ -4,6 +4,7 @@ import { ValidationUtils } from '@nimiq/utils'
 import { isValidNimiqAddress, normalizeNimiqAddress } from '../src/lib/address.ts'
 import { formatLunaAsNim, parseNimToLuna } from '../src/lib/amount.ts'
 import { createPaymentIntent, validatePaymentDraft } from '../src/lib/intent.ts'
+import { isNimiqNetwork } from '../src/lib/network.ts'
 
 const VALID_ADDRESS = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000'
 
@@ -64,13 +65,20 @@ describe('Payment intent creation', () => {
     assert.equal(result.ok, true)
     if (result.ok) {
       assert.equal(result.intent.asset, 'NIM')
-      assert.equal(result.intent.network, 'Nimiq')
+      assert.equal(result.intent.network, 'NIMIQ_TESTNET')
+      assert.notEqual(result.intent.network, 'Nimiq')
       assert.equal(result.intent.amountLuna, 250_000)
       assert.equal(result.intent.amountNim, '2.5')
       assert.equal(result.intent.purpose, 'Test invoice')
       assert.equal(result.intent.status, 'created')
       assert.equal(result.intent.transactionHash, null)
     }
+  })
+
+  it('does not use the generic string Nimiq as a network identifier', () => {
+    assert.equal(isNimiqNetwork('Nimiq'), false)
+    assert.equal(isNimiqNetwork('NIMIQ_TESTNET'), true)
+    assert.equal(isNimiqNetwork('NIMIQ_MAINNET'), true)
   })
 
   it('returns field errors for an empty recipient and a zero amount', () => {

@@ -22,7 +22,7 @@ function intent(overrides: Partial<ExpectedNimPayment> = {}): ExpectedNimPayment
     recipient: RECIPIENT,
     amountLuna: AMOUNT_LUNA,
     asset: 'NIM',
-    network: 'Nimiq',
+    network: 'NIMIQ_TESTNET',
     ...overrides,
   }
 }
@@ -96,13 +96,21 @@ describe('verifyPayment', () => {
     assert.equal(result.observedNetworkId, MAINALBATROSS_NETWORK_ID)
   })
 
-  it('does not treat intent.network as evidence of Testnet vs Mainnet', () => {
+  it('uses observed networkId as evidence against the explicit intent network', () => {
     const result = verifyPayment(
-      intent({ network: 'Nimiq' }),
+      intent({ network: 'NIMIQ_TESTNET' }),
       included({ networkId: MAINALBATROSS_NETWORK_ID }),
     )
     assert.equal(result.outcome, 'MISMATCH')
     assert.equal(result.reason, 'WRONG_NETWORK')
+  })
+
+  it('accepts MainAlbatross evidence when the intent is NIMIQ_MAINNET', () => {
+    const result = verifyPayment(
+      intent({ network: 'NIMIQ_MAINNET' }),
+      included({ networkId: MAINALBATROSS_NETWORK_ID }),
+    )
+    assert.equal(result.outcome, 'VERIFIED')
   })
 
   it('returns FAILED when executionResult is false', () => {

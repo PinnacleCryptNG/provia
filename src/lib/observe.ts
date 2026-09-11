@@ -1,10 +1,7 @@
 import { normalizeNimiqAddress } from './address.ts'
+import { NIMIQ_TESTNET_RPC_URL } from './network.ts'
 
-/** Official Developer Center playground default. Mainnet. No SLA. */
-export const NIMIQ_MAINNET_RPC_URL = 'https://rpc.nimiqwatch.com'
-
-/** Same public operator as the playground, TestAlbatross. Confirmed live in this spike. */
-export const NIMIQ_TESTNET_RPC_URL = 'https://rpc.testnet.nimiqwatch.com'
+export { NIMIQ_MAINNET_RPC_URL, NIMIQ_TESTNET_RPC_URL } from './network.ts'
 
 /** JSON-RPC method documented at nimiq.dev/rpc/methods/get-transaction-by-hash */
 export const GET_TRANSACTION_BY_HASH = 'getTransactionByHash'
