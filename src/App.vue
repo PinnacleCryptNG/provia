@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
 import CreatePayment from './components/CreatePayment.vue'
 import JourneySteps from './components/JourneySteps.vue'
 import ProofReceipt from './components/ProofReceipt.vue'
 import ReviewPayment from './components/ReviewPayment.vue'
-import SendDiagnostic from './components/SendDiagnostic.vue'
 import VerificationPayment from './components/VerificationPayment.vue'
 import { isIntentId, isProofId } from './lib/ids'
 import {
@@ -64,6 +63,9 @@ const sharedProofMissing = ref(false)
 const createFormKey = ref(0)
 const sendDiagnostic = ref<PaymentSendDiagnostic | null>(null)
 const showSendDiagnostic = import.meta.env.DEV
+const SendDiagnostic = import.meta.env.DEV
+  ? defineAsyncComponent(() => import('./components/SendDiagnostic.vue'))
+  : null
 
 let provider: NimiqProvider | null = null
 let observationRun = 0
@@ -359,8 +361,9 @@ function restart() {
         @retry="retryVerification"
         @restart="restart"
       />
-      <SendDiagnostic
-        v-if="showSendDiagnostic && sendDiagnostic && (screen === 'review' || screen === 'verify')"
+      <component
+        :is="SendDiagnostic"
+        v-if="showSendDiagnostic && SendDiagnostic && sendDiagnostic && (screen === 'review' || screen === 'verify')"
         :diagnostic="sendDiagnostic"
       />
       <p v-if="proofError && screen === 'verify'" class="error">{{ proofError }}</p>
