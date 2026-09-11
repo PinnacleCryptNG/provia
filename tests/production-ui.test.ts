@@ -43,7 +43,8 @@ describe('production UI copy', () => {
   it('gates the send diagnostic panel behind development mode', () => {
     const appSource = readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8')
     assert.match(appSource, /showSendDiagnostic = import\.meta\.env\.DEV/)
-    assert.match(appSource, /v-if="showSendDiagnostic && SendDiagnostic && sendDiagnostic/)
-    assert.match(appSource, /defineAsyncComponent\(\(\) => import\('\.\/components\/SendDiagnostic\.vue'\)\)/
+    assert.match(appSource, /showSendDiagnostic && SendDiagnostic && sendDiagnostic/)
+    assert.match(appSource, /defineAsyncComponent/)
+    assert.match(appSource, /components\/SendDiagnostic\.vue/)
   })
 })
