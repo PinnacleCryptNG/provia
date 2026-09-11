@@ -156,12 +156,14 @@ describe('POST /api/proofs', () => {
   })
 
   it('issues unpredictable non-sequential proof IDs', async () => {
-    const rpc = createTrackedRpcObserver(() => rpcSuccess(rpcTx()))
+    const rpc = createTrackedRpcObserver((hash) => rpcSuccess(rpcTx({ hash })))
     await withServer(rpc.observe, async (baseUrl) => {
       const ids: string[] = []
       for (let index = 0; index < 5; index += 1) {
         const intentId = await createIntent(baseUrl)
-        const created = await postJson(baseUrl, '/api/proofs', { intentId, transactionHash: HASH })
+        const transactionHash = `${HASH.slice(0, -1)}${index.toString(16)}`
+        const created = await postJson(baseUrl, '/api/proofs', { intentId, transactionHash })
+        assert.equal(created.status, 201, JSON.stringify(created.json))
         ids.push(created.json.proofId as string)
       }
 
