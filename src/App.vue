@@ -19,9 +19,12 @@ import {
 import {
   initializeNimiqProvider,
   isUserRejection,
+  PHASE_6B_SEND_METHOD,
+  proviaIntentPaymentData,
   sendBasicNimPayment,
   toProviderConnectionError,
   toUserFacingError,
+  type Phase6bSendDiagnostic,
 } from './lib/nimiq'
 import {
   createProviaApiVerificationService,
@@ -60,6 +63,13 @@ const proof = ref<ProofRecord | null>(null)
 const proofError = ref<string | null>(null)
 const sharedProofMissing = ref(false)
 const createFormKey = ref(0)
+const sendDiagnostic = ref<Phase6bSendDiagnostic | null>(null)
+
+const phase6bPreviewData = computed(() => {
+  return intent.value && isIntentId(intent.value.id)
+    ? proviaIntentPaymentData(intent.value.id)
+    : null
+})
 
 let provider: NimiqProvider | null = null
 let observationRun = 0
@@ -236,11 +246,13 @@ async function confirmPayment() {
   isSubmitting.value = true
 
   try {
-    const transactionHash = await sendBasicNimPayment(provider, {
+    const diagnostic = await sendBasicNimPayment(provider, {
       recipient: intent.value.recipient,
       valueLuna: intent.value.amountLuna,
+      intentId: intent.value.id,
     })
-    const submitted = withSubmittedHash(intent.value, transactionHash)
+    sendDiagnostic.value = diagnostic
+    const submitted = withSubmittedHash(intent.value, diagnostic.transactionHash)
     intent.value = submitted
     flowState.value = stateAfterWalletHash(submitted)
     screen.value = 'verify'
@@ -277,6 +289,7 @@ function restart() {
   flowState.value = null
   proof.value = null
   createFormKey.value += 1
+  sendDiagnostic.value = null
   screen.value = 'create'
   clearProofQuery()
 }
@@ -343,6 +356,8 @@ function restart() {
         :intent="intent"
         :is-submitting="isSubmitting"
         :error-message="submitError"
+        :phase6b-method="PHASE_6B_SEND_METHOD"
+        :phase6b-data="phase6bPreviewData"
         @back="backToCreate"
         @confirm="confirmPayment"
       />
@@ -352,6 +367,35 @@ function restart() {
         @retry="retryVerification"
         @restart="restart"
       />
+      <section
+        v-if="sendDiagnostic && (screen === 'review' || screen === 'verify')"
+        class="panel diagnostic"
+      >
+        <h2>Phase 6B send diagnostic</h2>
+        <p class="hint">Temporary Testnet experiment. The verifier is unchanged and will not accept this payment because of extra data or an HTLC sender.</p>
+        <dl>
+          <div>
+            <dt>Intent ID</dt>
+            <dd class="mono">{{ sendDiagnostic.intentId }}</dd>
+          </div>
+          <div>
+            <dt>Method</dt>
+            <dd class="mono">{{ sendDiagnostic.method }}</dd>
+          </div>
+          <div>
+            <dt>Data supplied</dt>
+            <dd class="mono">{{ sendDiagnostic.data }}</dd>
+          </div>
+          <div>
+            <dt>Returned value</dt>
+            <dd class="mono">{{ sendDiagnostic.returnedValue }}</dd>
+          </div>
+          <div>
+            <dt>Transaction hash used for verify</dt>
+            <dd class="mono">{{ sendDiagnostic.transactionHash }}</dd>
+          </div>
+        </dl>
+      </section>
       <p v-if="proofError && screen === 'verify'" class="error">{{ proofError }}</p>
     </template>
   </main>
@@ -461,6 +505,45 @@ h1 {
   border-radius: 0.85rem;
   border: 1px solid rgb(224 180 79 / 35%);
   background: rgb(224 180 79 / 10%);
+}
+
+.diagnostic {
+  margin-top: 1rem;
+  border-color: rgb(224 180 79 / 45%);
+}
+
+.diagnostic .hint {
+  margin: 0 0 0.85rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.diagnostic dl {
+  margin: 0;
+}
+
+.diagnostic dl div {
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.diagnostic dt {
+  margin: 0 0 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.diagnostic dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88rem;
 }
 
 .error {

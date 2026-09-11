@@ -6,6 +6,8 @@ defineProps<{
   intent: PaymentIntent
   isSubmitting: boolean
   errorMessage: string | null
+  phase6bMethod: string
+  phase6bData: string | null
 }>()
 
 const emit = defineEmits<{
@@ -40,6 +42,12 @@ const emit = defineEmits<{
 
     <p class="notice">
       Wallet submission is not verification. PROVIA verifies the payment independently after it is submitted. Verification requires 60 blockchain confirmations.
+    </p>
+
+    <p class="notice test">
+      Phase 6B Testnet experiment: this confirm calls {{ phase6bMethod }} with data
+      <span class="mono">{{ phase6bData ?? 'PROVIA:&lt;intentId&gt;' }}</span>.
+      The verifier is unchanged and will not accept the result automatically.
     </p>
 
     <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
@@ -110,6 +118,17 @@ dd {
   background: rgb(224 180 79 / 10%);
   color: var(--text);
   font-size: 0.92rem;
+}
+
+.notice.test {
+  background: rgb(61 134 196 / 12%);
+}
+
+.mono {
+  display: inline-block;
+  margin-top: 0.2rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
 }
 
 .error {

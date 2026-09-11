@@ -93,13 +93,30 @@ export async function listNimiqAccounts(provider: NimiqProvider): Promise<string
   return result
 }
 
+/** Phase 6B Testnet experiment only. Not production payment binding. */
+export const PHASE_6B_SEND_METHOD = 'sendBasicTransactionWithData' as const
+
+export function proviaIntentPaymentData(intentId: string): string {
+  return `PROVIA:${intentId}`
+}
+
+export type Phase6bSendDiagnostic = {
+  intentId: string
+  method: typeof PHASE_6B_SEND_METHOD
+  data: string
+  returnedValue: string
+  transactionHash: string
+}
+
 export async function sendBasicNimPayment(
   provider: NimiqProvider,
-  payment: { recipient: string, valueLuna: number },
-): Promise<string> {
-  const result = await provider.sendBasicTransaction({
+  payment: { recipient: string, valueLuna: number, intentId: string },
+): Promise<Phase6bSendDiagnostic> {
+  const data = proviaIntentPaymentData(payment.intentId)
+  const result = await provider.sendBasicTransactionWithData({
     recipient: payment.recipient,
     value: payment.valueLuna,
+    data,
   })
 
   const errorMessage = getProviderErrorMessage(result)
@@ -108,8 +125,17 @@ export async function sendBasicNimPayment(
   }
 
   if (typeof result !== 'string' || result.length === 0) {
-    throw new Error('Unexpected sendBasicTransaction response shape.')
+    throw new Error('Unexpected sendBasicTransactionWithData response shape.')
   }
 
-  return result
+  const diagnostic: Phase6bSendDiagnostic = {
+    intentId: payment.intentId,
+    method: PHASE_6B_SEND_METHOD,
+    data,
+    returnedValue: result,
+    transactionHash: result,
+  }
+
+  console.info('[PROVIA Phase 6B send]', diagnostic)
+  return diagnostic
 }
