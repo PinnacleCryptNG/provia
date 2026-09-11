@@ -254,6 +254,9 @@ function restart() {
         against independent blockchain evidence.
       </p>
       <p v-if="isProviderReady && !proof" class="connected">Nimiq Pay connected</p>
+      <p v-else-if="!proof && !isInitializing" class="status">
+        Sending a payment requires Nimiq Pay. You can still create and review an intent here.
+      </p>
     </header>
 
     <ProofReceipt
@@ -268,24 +271,11 @@ function restart() {
       <p>Ask the sender to create the payment again, or create a new payment in Nimiq Pay.</p>
     </section>
 
-    <p v-else-if="isInitializing" class="status" role="status">
+    <p v-if="isInitializing && !proof && !sharedProofMissing" class="status" role="status">
       Waiting for Nimiq Pay to initialize the provider...
     </p>
 
-    <section v-else-if="!isProviderReady" class="panel" aria-live="polite">
-      <h2>Open this app inside Nimiq Pay</h2>
-      <p>
-        The Nimiq provider was not found. PROVIA has to run in Nimiq Pay's Mini
-        Apps browser so the wallet can inject the provider.
-      </p>
-      <p v-if="initError" class="error">{{ initError }}</p>
-      <p>
-        In Nimiq Pay, open Mini Apps and enter this machine's Network URL, for
-        example <code>http://192.168.x.x:5173</code>. Do not use localhost.
-      </p>
-    </section>
-
-    <template v-else>
+    <template v-if="!proof && !sharedProofMissing">
       <CreatePayment
         :key="createFormKey"
         v-show="screen === 'create'"
