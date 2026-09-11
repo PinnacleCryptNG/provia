@@ -21,6 +21,7 @@ export type VerificationFlowState =
 
 export function expectedPaymentFromIntent(intent: PaymentIntent): ExpectedNimPayment {
   return {
+    intentId: intent.id,
     recipient: intent.recipient,
     amountLuna: intent.amountLuna,
     asset: intent.asset,

@@ -61,6 +61,7 @@ function isVerificationResult(value: unknown): value is VerificationResult {
 function unavailableResult(intent: PaymentIntent, message: string): VerificationResult {
   return verifyPayment(
     {
+      intentId: intent.id,
       recipient: intent.recipient,
       amountLuna: intent.amountLuna,
       asset: intent.asset,

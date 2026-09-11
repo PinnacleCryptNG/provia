@@ -377,7 +377,7 @@ function mismatchView(intent: PaymentIntent, result: VerificationResult): Verifi
     ? 'The transaction was found on a different Nimiq network than the payment request.'
     : result.reason === 'WRONG_ASSET'
       ? 'The transaction is not a NIM payment.'
-      : 'The transaction is not the intended basic NIM payment.'
+      : 'The transaction is not the intended NIM payment.'
 
   return {
     kind: 'mismatch',

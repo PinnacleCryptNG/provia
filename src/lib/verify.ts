@@ -1,6 +1,12 @@
 import { normalizeNimiqAddress } from './address.ts'
 import { expectedNetworkId, type NimiqNetwork } from './network.ts'
-import type { NimIncludedObservation, NimObservationResult, NimTransactionKind } from './observe.ts'
+import {
+  isBoundHtlcPayoutShape,
+  type NimIncludedObservation,
+  type NimObservationResult,
+  type NimTransactionKind,
+} from './observe.ts'
+import { recipientDataMatchesIntent } from './payment-data.ts'
 
 export {
   MAINALBATROSS_NETWORK_ID,
@@ -15,6 +21,7 @@ export {
 export const MIN_CONFIRMATIONS = 60
 
 export type ExpectedNimPayment = {
+  intentId: string
   recipient: string
   amountLuna: number
   asset: string
@@ -142,6 +149,10 @@ export function verifyPayment(
     }
   }
 
+  if (isBoundHtlcPayoutShape(observation)) {
+    return verifyBoundHtlcPayment(intent, observation, observed)
+  }
+
   if (observation.kind !== 'basic_transfer') {
     return {
       ...observed,
@@ -150,6 +161,44 @@ export function verifyPayment(
     }
   }
 
+  if (
+    observation.fromType !== 0
+    || observation.toType !== 0
+    || observation.flags !== 0
+    || observation.senderData.length > 0
+    || observation.recipientData.length > 0
+  ) {
+    return {
+      ...observed,
+      outcome: 'MISMATCH',
+      reason: 'UNSUPPORTED_TRANSACTION',
+    }
+  }
+
+  return verifyMatchingPaymentFields(intent, observation, observed)
+}
+
+function verifyBoundHtlcPayment(
+  intent: ExpectedNimPayment,
+  observation: NimIncludedObservation,
+  observed: Omit<VerificationResult, 'outcome' | 'reason'>,
+): VerificationResult {
+  if (!recipientDataMatchesIntent(observation.recipientData, intent.intentId)) {
+    return {
+      ...observed,
+      outcome: 'MISMATCH',
+      reason: 'UNSUPPORTED_TRANSACTION',
+    }
+  }
+
+  return verifyMatchingPaymentFields(intent, observation, observed)
+}
+
+function verifyMatchingPaymentFields(
+  intent: ExpectedNimPayment,
+  observation: NimIncludedObservation,
+  observed: Omit<VerificationResult, 'outcome' | 'reason'>,
+): VerificationResult {
   if (observation.networkId !== expectedNetworkId(intent.network)) {
     return {
       ...observed,

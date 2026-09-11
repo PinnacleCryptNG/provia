@@ -5,6 +5,7 @@ import {
   NIMIQ_TESTNET_RPC_URL,
   classifyObservedTransaction,
   getNimTransactionByHash,
+  isBoundHtlcPayoutShape,
   normalizeTransactionHash,
   parseNimTransactionData,
 } from '../src/lib/observe.ts'
@@ -84,6 +85,33 @@ describe('Nimiq transaction observation parser', () => {
     )
   })
 
+  it('classifies a bound HTLC payout shape without allowlisting the sender', () => {
+    const htlc = {
+      from: 'NQ38 7NCU 6AMJ M6GG 18X9 PNKM YFYD 1YNJ XY09',
+      to: 'NQ18 EB07 6C9M SS4R LTAT 44NN 1DEF U5YQ 3X0S',
+      fromType: 2,
+      toType: 0,
+      flags: 0,
+      senderData: '',
+      recipientData: '50524f5649413a70695f3663633263323864616538373535313031613834346630306465323539343761',
+    }
+
+    assert.equal(classifyObservedTransaction(htlc), 'htlc_payout')
+    assert.equal(isBoundHtlcPayoutShape(htlc), true)
+    assert.equal(
+      classifyObservedTransaction({ ...htlc, recipientData: '' }),
+      'contract',
+    )
+    assert.equal(
+      classifyObservedTransaction({ ...htlc, flags: 1 }),
+      'contract',
+    )
+  })
+
+  it('keeps empty-data basic transfers as basic_transfer', () => {
+    assert.equal(classifyObservedTransaction(BASIC_TRANSFER_FIXTURE), 'basic_transfer')
+  })
+
   it('does not fabricate a transaction when required fields are missing', () => {
     const parsed = parseNimTransactionData({ hash: BASIC_TRANSFER_FIXTURE.hash }, BASIC_TRANSFER_FIXTURE.hash)
     assert.equal(parsed.status, 'rpc_error')
@@ -128,5 +156,26 @@ describe('Live TestAlbatross getTransactionByHash', () => {
       { rpcUrl: NIMIQ_TESTNET_RPC_URL },
     )
     assert.equal(result.status, 'not_found')
+  })
+
+  it('retrieves the confirmed Phase 6B bound HTLC payout', async () => {
+    const hash = '0b2eb800494c22c8c7cdd3d196a12156f5b7749bd0983836940273ee013faf5b'
+    const result = await getNimTransactionByHash(hash, { rpcUrl: NIMIQ_TESTNET_RPC_URL })
+    assert.equal(result.status, 'included', JSON.stringify(result))
+    if (result.status === 'included') {
+      assert.equal(result.kind, 'htlc_payout')
+      assert.equal(result.fromType, 2)
+      assert.equal(result.toType, 0)
+      assert.equal(result.flags, 0)
+      assert.equal(result.senderData, '')
+      assert.equal(result.to, 'NQ18 EB07 6C9M SS4R LTAT 44NN 1DEF U5YQ 3X0S')
+      assert.equal(result.valueLuna, 100_000)
+      assert.equal(result.networkId, 5)
+      assert.equal(result.executionResult, true)
+      assert.equal(
+        result.recipientData,
+        '50524f5649413a70695f3663633263323864616538373535313031613834346630306465323539343761',
+      )
+    }
   })
 })

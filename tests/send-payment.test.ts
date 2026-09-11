@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 import type { NimiqProvider } from '@nimiq/mini-app-sdk'
 import {
   isUserRejection,
-  PHASE_6B_SEND_METHOD,
+  NIMIQ_PAY_SEND_METHOD,
   proviaIntentPaymentData,
   sendBasicNimPayment,
   toUserFacingError,
@@ -18,10 +18,10 @@ function mockProvider(
   return { sendBasicTransactionWithData } as NimiqProvider
 }
 
-describe('sendBasicNimPayment Phase 6B', () => {
+describe('sendBasicNimPayment', () => {
   it('formats the intent identifier as PROVIA:<intentId>', () => {
     assert.equal(proviaIntentPaymentData(INTENT_ID), `PROVIA:${INTENT_ID}`)
-    assert.equal(PHASE_6B_SEND_METHOD, 'sendBasicTransactionWithData')
+    assert.equal(NIMIQ_PAY_SEND_METHOD, 'sendBasicTransactionWithData')
   })
 
   it('calls sendBasicTransactionWithData with recipient, value, and intent data', async () => {

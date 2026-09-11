@@ -1,4 +1,7 @@
 import { init, type ErrorResponse, type NimiqProvider } from '@nimiq/mini-app-sdk'
+import { proviaIntentPaymentData } from './payment-data.ts'
+
+export { proviaIntentPaymentData } from './payment-data.ts'
 
 const INIT_TIMEOUT_MS = 10_000
 
@@ -93,16 +96,12 @@ export async function listNimiqAccounts(provider: NimiqProvider): Promise<string
   return result
 }
 
-/** Phase 6B Testnet experiment only. Not production payment binding. */
-export const PHASE_6B_SEND_METHOD = 'sendBasicTransactionWithData' as const
+/** Nimiq Pay Mini App send path. Data is the server-owned intent binding. */
+export const NIMIQ_PAY_SEND_METHOD = 'sendBasicTransactionWithData' as const
 
-export function proviaIntentPaymentData(intentId: string): string {
-  return `PROVIA:${intentId}`
-}
-
-export type Phase6bSendDiagnostic = {
+export type PaymentSendDiagnostic = {
   intentId: string
-  method: typeof PHASE_6B_SEND_METHOD
+  method: typeof NIMIQ_PAY_SEND_METHOD
   data: string
   returnedValue: string
   transactionHash: string
@@ -111,7 +110,7 @@ export type Phase6bSendDiagnostic = {
 export async function sendBasicNimPayment(
   provider: NimiqProvider,
   payment: { recipient: string, valueLuna: number, intentId: string },
-): Promise<Phase6bSendDiagnostic> {
+): Promise<PaymentSendDiagnostic> {
   const data = proviaIntentPaymentData(payment.intentId)
   const result = await provider.sendBasicTransactionWithData({
     recipient: payment.recipient,
@@ -128,14 +127,14 @@ export async function sendBasicNimPayment(
     throw new Error('Unexpected sendBasicTransactionWithData response shape.')
   }
 
-  const diagnostic: Phase6bSendDiagnostic = {
+  const diagnostic: PaymentSendDiagnostic = {
     intentId: payment.intentId,
-    method: PHASE_6B_SEND_METHOD,
+    method: NIMIQ_PAY_SEND_METHOD,
     data,
     returnedValue: result,
     transactionHash: result,
   }
 
-  console.info('[PROVIA Phase 6B send]', diagnostic)
+  console.info('[PROVIA send]', diagnostic)
   return diagnostic
 }

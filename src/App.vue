@@ -19,12 +19,12 @@ import {
 import {
   initializeNimiqProvider,
   isUserRejection,
-  PHASE_6B_SEND_METHOD,
+  NIMIQ_PAY_SEND_METHOD,
   proviaIntentPaymentData,
   sendBasicNimPayment,
   toProviderConnectionError,
   toUserFacingError,
-  type Phase6bSendDiagnostic,
+  type PaymentSendDiagnostic,
 } from './lib/nimiq'
 import {
   createProviaApiVerificationService,
@@ -63,9 +63,9 @@ const proof = ref<ProofRecord | null>(null)
 const proofError = ref<string | null>(null)
 const sharedProofMissing = ref(false)
 const createFormKey = ref(0)
-const sendDiagnostic = ref<Phase6bSendDiagnostic | null>(null)
+const sendDiagnostic = ref<PaymentSendDiagnostic | null>(null)
 
-const phase6bPreviewData = computed(() => {
+const paymentBindingData = computed(() => {
   return intent.value && isIntentId(intent.value.id)
     ? proviaIntentPaymentData(intent.value.id)
     : null
@@ -356,8 +356,8 @@ function restart() {
         :intent="intent"
         :is-submitting="isSubmitting"
         :error-message="submitError"
-        :phase6b-method="PHASE_6B_SEND_METHOD"
-        :phase6b-data="phase6bPreviewData"
+        :binding-method="NIMIQ_PAY_SEND_METHOD"
+        :binding-data="paymentBindingData"
         @back="backToCreate"
         @confirm="confirmPayment"
       />
@@ -371,8 +371,8 @@ function restart() {
         v-if="sendDiagnostic && (screen === 'review' || screen === 'verify')"
         class="panel diagnostic"
       >
-        <h2>Phase 6B send diagnostic</h2>
-        <p class="hint">Temporary Testnet experiment. The verifier is unchanged and will not accept this payment because of extra data or an HTLC sender.</p>
+        <h2>On-chain payment binding</h2>
+        <p class="hint">Nimiq Pay attaches this identifier as transaction data. PROVIA verifies it independently against the blockchain.</p>
         <dl>
           <div>
             <dt>Intent ID</dt>

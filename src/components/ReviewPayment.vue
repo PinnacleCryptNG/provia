@@ -6,8 +6,8 @@ defineProps<{
   intent: PaymentIntent
   isSubmitting: boolean
   errorMessage: string | null
-  phase6bMethod: string
-  phase6bData: string | null
+  bindingMethod: string
+  bindingData: string | null
 }>()
 
 const emit = defineEmits<{
@@ -45,9 +45,9 @@ const emit = defineEmits<{
     </p>
 
     <p class="notice test">
-      Phase 6B Testnet experiment: this confirm calls {{ phase6bMethod }} with data
-      <span class="mono">{{ phase6bData ?? 'PROVIA:&lt;intentId&gt;' }}</span>.
-      The verifier is unchanged and will not accept the result automatically.
+      Nimiq Pay will attach on-chain data
+      <span class="mono">{{ bindingData ?? 'PROVIA:&lt;intentId&gt;' }}</span>
+      via {{ bindingMethod }}. PROVIA verifies that exact binding independently. An HTLC payout without this identifier is not accepted.
     </p>
 
     <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>

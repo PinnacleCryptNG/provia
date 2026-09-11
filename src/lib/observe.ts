@@ -15,7 +15,7 @@ const STAKING_CONTRACT_ADDRESS = 'NQ77 0000 0000 0000 0000 0000 0000 0000 0001'
 
 const HASH_PATTERN = /^(?:0x)?[0-9a-fA-F]{64}$/
 
-export type NimTransactionKind = 'basic_transfer' | 'reward' | 'contract' | 'other'
+export type NimTransactionKind = 'basic_transfer' | 'htlc_payout' | 'reward' | 'contract' | 'other'
 
 export type NimIncludedObservation = {
   status: 'included'
@@ -81,6 +81,22 @@ function readOptionalBoolean(value: unknown): boolean | null {
   return typeof value === 'boolean' ? value : null
 }
 
+export function isBoundHtlcPayoutShape(tx: {
+  to: string
+  fromType: number
+  toType: number
+  flags: number
+  senderData: string
+  recipientData: string
+}): boolean {
+  return tx.fromType === 2
+    && tx.toType === 0
+    && tx.flags === 0
+    && tx.senderData.length === 0
+    && tx.recipientData.length > 0
+    && normalizeNimiqAddress(tx.to) !== STAKING_CONTRACT_ADDRESS
+}
+
 export function classifyObservedTransaction(tx: {
   from: string
   to: string
@@ -95,6 +111,10 @@ export function classifyObservedTransaction(tx: {
 
   if (from === COINBASE_ADDRESS) {
     return 'reward'
+  }
+
+  if (isBoundHtlcPayoutShape(tx)) {
+    return 'htlc_payout'
   }
 
   const hasContractSignal = tx.flags !== 0

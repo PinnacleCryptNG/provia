@@ -71,6 +71,7 @@ export function publicIntent(stored: StoredPaymentIntent): PublicIntent {
 
 export function expectedPaymentFromStoredIntent(stored: StoredPaymentIntent): ExpectedNimPayment {
   return {
+    intentId: stored.intentId,
     recipient: stored.recipient,
     amountLuna: stored.amountLuna,
     asset: stored.asset,

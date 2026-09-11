@@ -201,6 +201,56 @@ describe('POST /api/verify', () => {
       assert.equal(rpc.calls[0]?.hash, HASH)
     })
   })
+
+  it('verifies a bound HTLC payout whose recipientData matches the server intent', async () => {
+    let boundIntentId = ''
+    const rpc = createTrackedRpcObserver(() => rpcSuccess(rpcTx({
+      fromType: 2,
+      from: 'NQ38 7NCU 6AMJ M6GG 18X9 PNKM YFYD 1YNJ XY09',
+      recipientData: Buffer.from(`PROVIA:${boundIntentId}`, 'utf8').toString('hex'),
+    })))
+
+    await withServer(rpc.observe, async (baseUrl) => {
+      boundIntentId = await createIntent(baseUrl)
+      const { json } = await postJson(baseUrl, '/api/verify', {
+        intentId: boundIntentId,
+        transactionHash: HASH,
+      })
+      assert.equal(json.outcome, 'VERIFIED')
+      assert.equal(json.observedKind, 'htlc_payout')
+      assert.equal(json.reason, null)
+    })
+  })
+
+  it('rejects an HTLC payout that matches recipient and amount but has no PROVIA binding', async () => {
+    const rpc = createTrackedRpcObserver(() => rpcSuccess(rpcTx({
+      fromType: 2,
+      from: 'NQ38 7NCU 6AMJ M6GG 18X9 PNKM YFYD 1YNJ XY09',
+      recipientData: '',
+    })))
+
+    await withServer(rpc.observe, async (baseUrl) => {
+      const intentId = await createIntent(baseUrl)
+      const { json } = await postJson(baseUrl, '/api/verify', { intentId, transactionHash: HASH })
+      assert.equal(json.outcome, 'MISMATCH')
+      assert.equal(json.reason, 'UNSUPPORTED_TRANSACTION')
+      assert.equal(json.observedKind, 'contract')
+    })
+  })
+
+  it('rejects a bound HTLC payout tagged with a different intent ID', async () => {
+    const rpc = createTrackedRpcObserver(() => rpcSuccess(rpcTx({
+      fromType: 2,
+      recipientData: Buffer.from('PROVIA:pi_cccccccccccccccccccccccccccccccc', 'utf8').toString('hex'),
+    })))
+
+    await withServer(rpc.observe, async (baseUrl) => {
+      const intentId = await createIntent(baseUrl)
+      const { json } = await postJson(baseUrl, '/api/verify', { intentId, transactionHash: HASH })
+      assert.equal(json.outcome, 'MISMATCH')
+      assert.equal(json.reason, 'UNSUPPORTED_TRANSACTION')
+    })
+  })
 })
 
 describe('PROVIA verification client', () => {

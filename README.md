@@ -6,6 +6,8 @@ A successful wallet submission is not proof of payment. PROVIA checks Nimiq bloc
 
 The Mini App creates a **server-owned payment intent**. After Nimiq Pay returns a transaction hash, the Mini App sends only `intentId` and `transactionHash`. The server looks up the stored intent, independently observes the Nimiq chain, and runs the shared `verifyPayment()` engine. A **PROVIA verification proof** is issued only when that engine returns `VERIFIED`.
 
+Nimiq Pay Testnet may settle `sendBasicTransactionWithData` as an HTLC payout (`fromType = 2`). PROVIA accepts that only when on-chain `recipientData` decodes exactly to `PROVIA:<serverIntentId>` and the recipient, amount, network, execution, and 60-confirmation checks still pass. Unbound HTLC payouts are rejected. Basic NIM transfers remain valid under the existing rules.
+
 ```text
 Mini App  →  PROVIA server  →  Nimiq RPC
 ```
