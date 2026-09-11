@@ -66,3 +66,5 @@ npm test
 ```bash
 npm run build
 ```
+
+Vercel serves the Vite build plus `api/index.ts`, which reuses `createProviaRequestListener()`. `vercel.json` rewrites `/api/*` to that function. Local `npm run dev` still uses Vite’s proxy to port `43124` and does not use the Vercel adapter.
