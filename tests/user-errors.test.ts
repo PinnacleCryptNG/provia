@@ -47,6 +47,25 @@ describe('user-facing error sanitization', () => {
     assert.doesNotMatch(toProofUserError(new Error('internal server error')), /internal|proof|RPC/i)
   })
 
+  it('surfaces recipient preflight failures without technical terms', () => {
+    assert.equal(
+      toCreatePaymentUserError(new Error('This recipient can’t receive a regular NIM payment.')),
+      'This recipient can’t receive a regular NIM payment.',
+    )
+    assert.equal(
+      toCreatePaymentUserError(new Error('This recipient can’t receive this payment.')),
+      'This recipient can’t receive this payment.',
+    )
+    assert.equal(
+      toCreatePaymentUserError(new Error('Couldn’t check this recipient. Please try again.')),
+      'Couldn’t check this recipient. Please try again.',
+    )
+    assert.doesNotMatch(
+      toCreatePaymentUserError(new Error('This recipient can’t receive a regular NIM payment.')),
+      /HTLC|accountType|RPC|intent/i,
+    )
+  })
+
   it('keeps the connect-wallet error human-readable', () => {
     assert.equal(CONNECT_WALLET_USER_ERROR, 'Couldn’t connect to Nimiq Pay.')
     assert.doesNotMatch(CONNECT_WALLET_USER_ERROR, /provider|SDK|RPC|stack/i)

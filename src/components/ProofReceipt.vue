@@ -60,7 +60,7 @@ async function copyRecord() {
     <div class="success-mark" aria-hidden="true">✓</div>
     <h2 class="title">Payment verified</h2>
     <p class="message">
-      Your payment was independently verified on the Nimiq blockchain.
+      The requested payment reached the intended recipient.
     </p>
     <p class="amount">{{ amount }}</p>
 

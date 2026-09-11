@@ -202,7 +202,7 @@ describe('verification UI orchestration', () => {
     assert.equal(view.kind, 'verified')
     assert.equal(view.title, 'Payment verified')
     assert.equal(view.showVerifiedLabel, true)
-    assert.match(view.message, /independently verified on the Nimiq blockchain/)
+    assert.match(view.message, /reached the intended recipient/)
     assert.match(view.note ?? '', /not a cryptographic certificate/)
     assert.ok(view.rows.some((row) => row.label === 'Amount'))
     assert.ok(view.rows.some((row) => row.label === 'Recipient'))

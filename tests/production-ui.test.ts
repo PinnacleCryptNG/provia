@@ -59,9 +59,10 @@ describe('production UI copy', () => {
     })
   }
 
-  it('keeps purpose as an optional dropdown in Send an asset', () => {
+  it('keeps purpose as an optional dropdown in Send NIM', () => {
     const source = read('src/components/CreatePayment.vue')
     const purposes = read('src/lib/purpose.ts')
+    assert.match(source, /Send NIM/)
     assert.match(source, /<select v-model="purpose"/)
     assert.match(source, /Select a purpose/)
     assert.match(source, /PAYMENT_PURPOSES/)
@@ -73,12 +74,12 @@ describe('production UI copy', () => {
     assert.doesNotMatch(source, /type="text"\s+name="purpose"/)
   })
 
-  it('keeps the homepage to a Send an asset prompt', () => {
+  it('keeps the homepage to a Send NIM prompt', () => {
     const source = read('src/components/HomeLanding.vue')
     assert.match(source, /Independent payment verification/)
     assert.match(source, /Send NIM in Nimiq Pay/)
     assert.match(source, /Nimiq Testnet/)
-    assert.match(source, />[\s]*Send an asset[\s]*</)
+    assert.match(source, />[\s]*Send NIM[\s]*</)
     assert.doesNotMatch(source, /Request a payment/)
     assert.doesNotMatch(source, /60 confirmations/)
     assert.doesNotMatch(source, /intent/i)
@@ -94,9 +95,9 @@ describe('production UI copy', () => {
 })
 
 describe('send-an-asset primary flow', () => {
-  it('shows Send an asset as the homepage primary action', () => {
+  it('shows Send NIM as the homepage primary action', () => {
     const home = read('src/components/HomeLanding.vue')
-    assert.match(home, /Send an asset/)
+    assert.match(home, /Send NIM/)
     assert.doesNotMatch(home, /Request a payment/)
   })
 
@@ -145,10 +146,13 @@ describe('send-an-asset primary flow', () => {
     assert.match(app, /PaymentDetailsChecked/)
     assert.match(app, /screen === 'checked' && intent/)
     assert.match(checked, /Payment details checked/)
-    assert.match(checked, /Everything looks good\. Your payment is ready to send\./)
-    assert.match(checked, /Review payment/)
+    assert.match(checked, /PROVIA checked the payment details before you approve/)
+    assert.match(checked, /Recipient type/)
+    assert.match(checked, /Regular account/)
+    assert.match(checked, /Review your payment/)
     assert.doesNotMatch(checked, /Payment verified/)
     assert.doesNotMatch(checked, /intent\.id/)
+    assert.doesNotMatch(checked, /poison/i)
   })
 
   it('keeps Review on the locked intent and Confirm in Nimiq Pay as the send action', () => {
@@ -156,6 +160,8 @@ describe('send-an-asset primary flow', () => {
     assert.match(review, /Review your payment/)
     assert.match(review, /intent\.amountNim/)
     assert.match(review, /shortenNimiqAddress\(intent\.recipient\)/)
+    assert.match(review, /address-full/)
+    assert.match(review, /intent\.recipient/)
     assert.match(review, /nimiqNetworkLabel\(intent\.network\)/)
     assert.match(review, /Confirm in Nimiq Pay/)
     assert.match(review, /emit\('confirm'\)/)

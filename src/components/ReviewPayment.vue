@@ -32,6 +32,7 @@ function confirm() {
       <div>
         <dt>To</dt>
         <dd class="address">{{ shortenNimiqAddress(intent.recipient) }}</dd>
+        <dd class="address-full">{{ intent.recipient }}</dd>
       </div>
       <div v-if="intent.purpose">
         <dt>Purpose</dt>
@@ -44,7 +45,7 @@ function confirm() {
     </dl>
 
     <p class="notice">
-      After you approve the transaction, PROVIA checks it on Nimiq Testnet. We wait for 60 confirmations before marking the payment verified.
+      PROVIA already checked these details. After you approve, it verifies that this recipient actually received the payment. We wait for 60 confirmations before marking the payment verified.
     </p>
 
     <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
@@ -111,6 +112,13 @@ dd {
 
 .address {
   font-size: 0.95rem;
+}
+
+.address-full {
+  margin-top: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
 }
 
 .notice {

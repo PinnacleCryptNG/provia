@@ -9,6 +9,8 @@ import {
   publicIntent,
   type IntentStore,
 } from './intents.ts'
+import { createNimiqAccountLookup, type LookupAccount } from '../src/lib/account.ts'
+import { runRecipientPreflight } from '../src/lib/recipient-preflight.ts'
 import { createNimiqRpcObserver, type ObserveTransaction } from './observation.ts'
 import {
   createProofStore,
@@ -31,6 +33,7 @@ const MAX_BODY_BYTES = 32 * 1024
 
 export type ProviaServerOptions = {
   observe?: ObserveTransaction
+  lookupAccount?: LookupAccount
   intents?: IntentStore
   proofs?: ProofStore
   reservations?: HashReservationStore
@@ -98,11 +101,12 @@ function matchNamedId(pathname: string, prefix: string): string | null {
 
 export function createProviaRequestListener(options: {
   observe: ObserveTransaction
+  lookupAccount: LookupAccount
   intents: IntentStore
   proofs: ProofStore
   reservations: HashReservationStore
 }): http.RequestListener {
-  const { observe, intents, proofs, reservations } = options
+  const { observe, lookupAccount, intents, proofs, reservations } = options
 
   return async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://provia.local')
@@ -139,7 +143,17 @@ export function createProviaRequestListener(options: {
         return
       }
 
-      const stored = intents.create(parsed.intent)
+      const preflight = await runRecipientPreflight(parsed.intent, lookupAccount)
+      if (!preflight.ok) {
+        json(res, 400, { error: preflight.error })
+        return
+      }
+
+      const stored = intents.create({
+        ...parsed.intent,
+        recipient: preflight.recipient,
+        network: preflight.network,
+      })
       json(res, 201, {
         intentId: stored.intentId,
         intent: publicIntent(stored),
@@ -276,10 +290,17 @@ export function createProviaRequestListener(options: {
 
 export function createProviaServer(options: ProviaServerOptions = {}): http.Server {
   const observe = options.observe ?? createNimiqRpcObserver()
+  const lookupAccount = options.lookupAccount ?? createNimiqAccountLookup()
   const intents = options.intents ?? createIntentStore()
   const proofs = options.proofs ?? createProofStore()
   const reservations = options.reservations ?? createHashReservationStore()
-  return http.createServer(createProviaRequestListener({ observe, intents, proofs, reservations }))
+  return http.createServer(createProviaRequestListener({
+    observe,
+    lookupAccount,
+    intents,
+    proofs,
+    reservations,
+  }))
 }
 
 export function startProviaServer(options: ProviaServerOptions = {}): http.Server {

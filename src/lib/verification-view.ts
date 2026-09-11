@@ -283,7 +283,7 @@ function verifiedView(intent: PaymentIntent, result: VerificationResult): Verifi
     kind: 'verified',
     eyebrow: 'Verified',
     title: 'Payment verified',
-    message: 'Your payment was independently verified on the Nimiq blockchain.',
+    message: 'The requested payment reached the intended recipient.',
     note: "This record reflects PROVIA's observation of the Nimiq blockchain. It is not a cryptographic certificate.",
     tone: 'positive',
     showVerifiedLabel: true,

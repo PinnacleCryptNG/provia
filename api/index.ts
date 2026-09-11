@@ -8,6 +8,7 @@ import { createIntentStore } from '../server/intents.ts'
 import { createNimiqRpcObserver } from '../server/observation.ts'
 import { createProofStore } from '../server/proofs.ts'
 import { createHashReservationStore } from '../server/verification.ts'
+import { createNimiqAccountLookup } from '../src/lib/account.ts'
 
 type VercelIncoming = IncomingMessage & {
   body?: unknown
@@ -140,10 +141,17 @@ function collectListenerResponse(
 
 export function createVercelApiHandler(options: ProviaServerOptions = {}) {
   const observe = options.observe ?? createNimiqRpcObserver()
+  const lookupAccount = options.lookupAccount ?? createNimiqAccountLookup()
   const intents = options.intents ?? createIntentStore()
   const proofs = options.proofs ?? createProofStore()
   const reservations = options.reservations ?? createHashReservationStore()
-  const listener = createProviaRequestListener({ observe, intents, proofs, reservations })
+  const listener = createProviaRequestListener({
+    observe,
+    lookupAccount,
+    intents,
+    proofs,
+    reservations,
+  })
 
   return (req: IncomingMessage, res: ServerResponse) => listener(adaptVercelRequest(req), res)
 }

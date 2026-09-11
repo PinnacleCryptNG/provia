@@ -16,7 +16,7 @@ const emit = defineEmits<{
 <template>
   <section class="panel">
     <h2>Payment details checked</h2>
-    <p class="lede">Everything looks good. Your payment is ready to send.</p>
+    <p class="lede">PROVIA checked the payment details before you approve.</p>
 
     <ul class="checks">
       <li>
@@ -40,14 +40,21 @@ const emit = defineEmits<{
           <span class="value">{{ nimiqNetworkLabel(intent.network) }}</span>
         </span>
       </li>
+      <li>
+        <span class="tick" aria-hidden="true">✓</span>
+        <span>
+          <strong>Recipient type</strong>
+          <span class="value">Regular account</span>
+        </span>
+      </li>
     </ul>
 
     <p class="notice">
-      PROVIA will independently verify the payment after you approve it in Nimiq Pay.
+      After you approve in Nimiq Pay, PROVIA checks whether the payment actually reached this recipient.
     </p>
 
     <button type="button" class="primary" @click="emit('review')">
-      Review payment
+      Review your payment
     </button>
     <button type="button" class="secondary" @click="emit('back')">
       Back

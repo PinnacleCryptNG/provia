@@ -47,7 +47,7 @@ watch(() => props.errors, (errors) => {
 
 <template>
   <form class="panel" @submit.prevent="submit">
-    <h2>Send an asset</h2>
+    <h2>Send NIM</h2>
 
     <p class="asset-label">Asset</p>
     <p class="asset-value">NIM</p>

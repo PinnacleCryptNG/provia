@@ -13,6 +13,7 @@ import { isIntentId } from '../src/lib/ids.ts'
 import {
   HASH,
   INTENT_DRAFT,
+  allowBasicLookup,
   createTrackedRpcObserver,
   postJson,
   rpcNotFound,
@@ -29,7 +30,10 @@ async function withAdapter(
   observe: ReturnType<typeof createTrackedRpcObserver>['observe'],
   fn: (baseUrl: string) => Promise<void>,
 ): Promise<void> {
-  const server = http.createServer(createVercelApiHandler({ observe }))
+  const server = http.createServer(createVercelApiHandler({
+    observe,
+    lookupAccount: allowBasicLookup(),
+  }))
   await new Promise<void>((resolve, reject) => {
     server.listen(0, '127.0.0.1', () => resolve())
     server.on('error', reject)

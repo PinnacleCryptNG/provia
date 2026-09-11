@@ -3,6 +3,9 @@ import { GET_TRANSACTION_BY_HASH } from '../src/lib/observe.ts'
 import { MIN_CONFIRMATIONS } from '../src/lib/verify.ts'
 import { createProviaServer } from '../server/index.ts'
 import { NIMIQ_RPC_URL, createNimiqRpcObserver, type ObserveTransaction } from '../server/observation.ts'
+import { normalizeNimiqAddress } from '../src/lib/address.ts'
+import type { LookupAccount } from '../src/lib/account.ts'
+import { rpcUrlForNetwork } from '../src/lib/network.ts'
 
 export const RECIPIENT = 'NQ61 XMNV XULY D874 G08H YDXK LK29 E7YR KFP6'
 export const OTHER_RECIPIENT = 'NQ07 0000 0000 0000 0000 0000 0000 0000 0000'
@@ -82,11 +85,27 @@ export function createTrackedRpcObserver(respond: (hash: string) => unknown): {
   }
 }
 
+export function allowBasicLookup(): LookupAccount {
+  return async (input) => ({
+    status: 'found',
+    account: {
+      address: normalizeNimiqAddress(input.address),
+      balanceLuna: 0,
+      type: 'basic',
+    },
+    rpcUrl: rpcUrlForNetwork(input.network),
+  })
+}
+
 export async function withServer(
   observe: ObserveTransaction,
   fn: (baseUrl: string) => Promise<void>,
+  options: { lookupAccount?: LookupAccount } = {},
 ): Promise<void> {
-  const server = createProviaServer({ observe })
+  const server = createProviaServer({
+    observe,
+    lookupAccount: options.lookupAccount ?? allowBasicLookup(),
+  })
   await new Promise<void>((resolve, reject) => {
     server.listen(0, '127.0.0.1', () => resolve())
     server.on('error', reject)

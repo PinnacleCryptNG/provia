@@ -11,7 +11,7 @@ defineEmits<{
       Send NIM in Nimiq Pay. PROVIA checks the payment on Nimiq Testnet before marking it verified.
     </p>
     <button type="button" class="primary" @click="$emit('start')">
-      Send an asset
+      Send NIM
     </button>
   </section>
 </template>

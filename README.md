@@ -4,9 +4,18 @@ PROVIA is a Nimiq Pay Mini App for independent payment verification.
 
 A successful wallet submission is not proof of payment. PROVIA checks Nimiq blockchain evidence independently, then issues a verification record only when the payment matches and has 60 confirmations.
 
-The Mini App creates a **server-owned payment intent**. After Nimiq Pay returns a transaction hash, the Mini App sends only `intentId` and `transactionHash`. The server looks up the stored intent, independently observes the Nimiq chain, and runs the shared `verifyPayment()` engine. A **PROVIA verification proof** is issued only when that engine returns `VERIFIED`.
+The Mini App creates a **server-owned payment intent**. Continue first checks the recipient on the selected Nimiq network, then stores the canonical recipient, amount, network, and intent ID. After Nimiq Pay returns a transaction hash, the Mini App sends only `intentId` and `transactionHash`. The server looks up the stored intent, independently observes the Nimiq chain, and runs the shared `verifyPayment()` engine. A **PROVIA verification proof** is issued only when that engine returns `VERIFIED`.
 
-Nimiq Pay Testnet may settle `sendBasicTransactionWithData` as an HTLC payout (`fromType = 2`). PROVIA accepts that only when on-chain `recipientData` decodes exactly to `PROVIA:<serverIntentId>` and the recipient, amount, network, execution, and 60-confirmation checks still pass. Unbound HTLC payouts are rejected. Basic NIM transfers remain valid under the existing rules.
+Recipient preflight uses `getAccountByAddress` on that network’s RPC:
+
+- Valid checksummed Nimiq address
+- Account exists/resolves on the selected network (no silent network fallback)
+- Reject HTLC, vesting, and staking **recipient** account types
+- Reject the protocol staking contract and coinbase addresses from `getPolicyConstants`
+
+Nimiq does not publish a protocol burn address. A zero-balance basic account is not treated as a burn. PROVIA does not claim address-poisoning detection from an address string; review shows the full stored recipient, and verification compares that exact recipient on-chain.
+
+Nimiq Pay Testnet may settle `sendBasicTransactionWithData` as an HTLC payout (`fromType = 2`). That is the **sender** of the observed settlement, not the intended recipient. PROVIA still accepts that path only when on-chain `recipientData` decodes exactly to `PROVIA:<serverIntentId>` and the recipient, amount, network, execution, and 60-confirmation checks still pass. Unbound HTLC payouts are rejected. Basic NIM transfers remain valid under the existing rules.
 
 ```text
 Mini App  →  PROVIA server  →  Nimiq RPC
@@ -75,7 +84,7 @@ Intents and proofs are in-memory for this prototype. Restarting the server clear
 
 1. Open Nimiq Pay on Testnet.
 2. Enter the Vite Network URL in Mini Apps.
-3. Send an asset. PROVIA checks and locks the payment details on the server before review.
+3. Send NIM. PROVIA checks the recipient and locks the payment details on the server before review.
 4. Confirm in Nimiq Pay.
 5. PROVIA independently verifies the on-chain payment after 60 confirmations. If it is verified, it issues a verification record for this session.
 

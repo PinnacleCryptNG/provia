@@ -408,7 +408,7 @@ function restart() {
       <h2>Record not available</h2>
       <p class="error">{{ proofError }}</p>
       <p>Verification records are kept for this session only.</p>
-      <button type="button" class="primary" @click="restart">Send an asset</button>
+      <button type="button" class="primary" @click="restart">Send NIM</button>
     </section>
 
     <template v-if="showPaymentFlow">

@@ -126,3 +126,68 @@ describe('POST /api/intents', () => {
     })
   })
 })
+
+describe('POST /api/intents recipient preflight', () => {
+  it('stores the exact normalized recipient after a successful preflight', async () => {
+    const rpc = createTrackedRpcObserver(() => rpcNotFound())
+    await withServer(rpc.observe, async (baseUrl) => {
+      const created = await postJson(baseUrl, '/api/intents', INTENT_DRAFT)
+      assert.equal(created.status, 201)
+      assert.equal((created.json.intent as { recipient: string }).recipient, RECIPIENT)
+    })
+  })
+
+  it('does not create an intent when the recipient is a contract', async () => {
+    const rpc = createTrackedRpcObserver(() => rpcNotFound())
+    const htlc = 'NQ38 7NCU 6AMJ M6GG 18X9 PNKM YFYD 1YNJ XY09'
+    await withServer(rpc.observe, async (baseUrl) => {
+      const created = await postJson(baseUrl, '/api/intents', {
+        ...INTENT_DRAFT,
+        recipient: htlc,
+      })
+      assert.equal(created.status, 400)
+      assert.match(String(created.json.error), /can’t receive a regular NIM payment/)
+      assert.equal(created.json.intentId, undefined)
+    }, {
+      lookupAccount: async (input) => ({
+        status: 'found',
+        account: {
+          address: input.address,
+          balanceLuna: 1,
+          type: 'htlc',
+        },
+        rpcUrl: 'https://rpc.testnet.nimiqwatch.com',
+      }),
+    })
+  })
+
+  it('does not create an intent when the recipient cannot be resolved', async () => {
+    const rpc = createTrackedRpcObserver(() => rpcNotFound())
+    await withServer(rpc.observe, async (baseUrl) => {
+      const created = await postJson(baseUrl, '/api/intents', INTENT_DRAFT)
+      assert.equal(created.status, 400)
+      assert.match(String(created.json.error), /Couldn’t check this recipient/)
+    }, {
+      lookupAccount: async () => ({ status: 'unresolved', message: 'Unknown format' }),
+    })
+  })
+
+  it('keeps wallet send from happening until a server intent exists', async () => {
+    const app = await import('node:fs').then((fs) => (
+      fs.readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8')
+    ))
+    const checkFn = app.slice(
+      app.indexOf('async function checkPaymentDetails'),
+      app.indexOf('function goToReview'),
+    )
+    const confirmFn = app.slice(
+      app.indexOf('async function confirmPayment'),
+      app.indexOf('function retryVerification'),
+    )
+    assert.match(checkFn, /createServerIntent/)
+    assert.doesNotMatch(checkFn, /sendBasicNimPayment/)
+    assert.match(checkFn, /screen\.value = 'checked'/)
+    assert.match(confirmFn, /sendBasicNimPayment/)
+    assert.match(confirmFn, /isIntentId\(current\.id\)/)
+  })
+})
