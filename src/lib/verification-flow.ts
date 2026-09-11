@@ -60,7 +60,7 @@ export type ObservePaymentOptions = {
 
 /**
  * Ask the PROVIA server to observe a submitted hash. Does not send, confirm,
- * or otherwise call the wallet, and does not run verifyPayment() locally.
+ * or otherwise call the wallet, and does not run the verifier locally.
  */
 export async function observePaymentEvidence(
   options: ObservePaymentOptions,

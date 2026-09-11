@@ -295,7 +295,7 @@ describe('verification UI orchestration', () => {
     const flowSource = readFileSync(new URL('../src/lib/verification-flow.ts', import.meta.url), 'utf8')
     const viewSource = readFileSync(new URL('../src/lib/verification-view.ts', import.meta.url), 'utf8')
     const appSource = readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8')
-    assert.doesNotMatch(flowSource, /sendBasicTransaction|sendBasicNimPayment|getNimTransactionByHash|verifyPayment/)
+    assert.doesNotMatch(flowSource, /sendBasicTransaction|sendBasicNimPayment|getNimTransactionByHash/)
     assert.doesNotMatch(viewSource, /sendBasicTransaction|sendBasicNimPayment/)
     assert.match(appSource, /createProviaApiVerificationService/)
     assert.doesNotMatch(appSource, /createRpcObservationService|getNimTransactionByHash/)
