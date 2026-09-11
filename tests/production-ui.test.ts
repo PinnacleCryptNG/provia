@@ -44,12 +44,14 @@ describe('production UI copy', () => {
 
   it('keeps purpose as an optional dropdown in Create Payment', () => {
     const source = readFileSync(new URL('../src/components/CreatePayment.vue', import.meta.url), 'utf8')
+    const purposes = readFileSync(new URL('../src/lib/purpose.ts', import.meta.url), 'utf8')
     assert.match(source, /<select v-model="purpose"/)
     assert.match(source, /Select a purpose/)
-    assert.match(source, /Invoice/)
-    assert.match(source, /Gift/)
-    assert.match(source, /Utilities/)
-    assert.match(source, /Friends & Family/)
+    assert.match(source, /PAYMENT_PURPOSES/)
+    assert.match(purposes, /Invoice/)
+    assert.match(purposes, /Gift/)
+    assert.match(purposes, /Utilities/)
+    assert.match(purposes, /Friends & Family/)
     assert.doesNotMatch(source, /type="text"\s+name="purpose"/)
   })
 
