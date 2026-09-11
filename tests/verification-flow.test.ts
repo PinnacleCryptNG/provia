@@ -114,7 +114,7 @@ describe('verification UI orchestration', () => {
     assert.equal(view.title, 'Payment submitted')
     assert.equal(
       view.message,
-      'The wallet accepted the transaction. PROVIA has not verified it yet.',
+      'Nimiq Pay accepted the transaction. PROVIA has not verified it yet.',
     )
     assert.equal(view.showVerifiedLabel, false)
     assert.equal(view.kind, 'submitted')
@@ -122,6 +122,23 @@ describe('verification UI orchestration', () => {
     assert.ok(view.rows.some((row) => row.label === 'Transaction'))
     assert.ok(view.rows.some((row) => row.label === 'Amount'))
     assert.ok(view.rows.some((row) => row.label === 'Recipient'))
+    assert.ok(view.rows.some((row) => row.label === 'Network'))
+  })
+
+  it('shows observing copy while looking up independent evidence', () => {
+    const view = toVerificationView({
+      screen: 'checking',
+      intent: submittedIntent(),
+      attempt: 1,
+      maxAttempts: DEFAULT_MAX_OBSERVATION_ATTEMPTS,
+    })
+
+    assert.equal(view.kind, 'checking')
+    assert.equal(view.title, 'Observing the blockchain')
+    assert.equal(view.eyebrow, 'Observing')
+    assert.match(view.message, /independently observing the Nimiq blockchain/)
+    assert.equal(view.showVerifiedLabel, false)
+    assert.ok(view.rows.some((row) => row.label === 'Network'))
   })
 
   it('keeps a not-found observation unresolved', async () => {
@@ -180,10 +197,12 @@ describe('verification UI orchestration', () => {
     assert.equal(view.kind, 'verified')
     assert.equal(view.title, 'Payment verified')
     assert.equal(view.showVerifiedLabel, true)
-    assert.match(view.message, /Recipient matched/)
-    assert.match(view.message, /amount matched/)
-    assert.match(view.message, /execution succeeded/)
-    assert.match(view.message, /60-confirmation/)
+    assert.match(view.message, /independently observed blockchain data/)
+    assert.match(view.note ?? '', /not a cryptographic certificate/)
+    assert.ok(view.rows.some((row) => row.label === 'Amount'))
+    assert.ok(view.rows.some((row) => row.label === 'Recipient'))
+    assert.ok(view.rows.some((row) => row.label === 'Network'))
+    assert.ok(view.rows.some((row) => row.label === 'Transaction'))
     assert.ok(view.rows.some((row) => row.label === 'Confirmations'))
     assert.ok(view.rows.some((row) => row.label === 'Block'))
     assert.equal(verification.calls.length, 1)
@@ -202,8 +221,9 @@ describe('verification UI orchestration', () => {
     assert.equal(result.outcome, 'MISMATCH')
     assert.equal(result.reason, 'WRONG_RECIPIENT')
     assert.equal(view.kind, 'wrong_recipient')
-    assert.equal(view.title, "Payment doesn't match")
-    assert.match(view.message, /different address/)
+    assert.equal(view.title, 'Payment not verified')
+    assert.equal(view.message, 'The observed transaction does not satisfy this payment request.')
+    assert.match(view.note ?? '', /different address/)
     assert.equal(view.showVerifiedLabel, false)
     assert.equal(verification.calls.length, 1)
   })
@@ -219,9 +239,10 @@ describe('verification UI orchestration', () => {
 
     assert.equal(result.outcome, 'UNDERPAID')
     assert.equal(view.kind, 'underpaid')
-    assert.equal(view.title, "Payment doesn't match")
+    assert.equal(view.title, 'Payment not verified')
+    assert.equal(view.message, 'The observed transaction does not satisfy this payment request.')
     assert.equal(
-      view.message,
+      view.note,
       'The amount observed on chain is less than the requested amount.',
     )
     assert.ok(view.rows.some((row) => row.label === 'Expected'))
@@ -241,8 +262,9 @@ describe('verification UI orchestration', () => {
     assert.equal(result.outcome, 'MISMATCH')
     assert.equal(result.reason, 'OVERPAID')
     assert.equal(view.kind, 'overpaid')
-    assert.equal(view.title, "Payment doesn't match")
-    assert.match(view.message, /greater than the requested amount/)
+    assert.equal(view.title, 'Payment not verified')
+    assert.equal(view.message, 'The observed transaction does not satisfy this payment request.')
+    assert.match(view.note ?? '', /greater than the requested amount/)
     assert.equal(view.tone, 'mismatch')
     assert.equal(view.showVerifiedLabel, false)
   })

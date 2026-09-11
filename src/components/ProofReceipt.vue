@@ -21,7 +21,7 @@ const amount = computed(() => `${formatLunaAsNim(props.proof.observedAmountLuna)
 const verifiedAt = computed(() => formatVerificationTime(props.proof.verifiedAt))
 
 const recordText = computed(() => [
-  'PROVIA verification record — this session only',
+  'PROVIA verification record',
   'Status: VERIFIED',
   `Amount: ${amount.value}`,
   `Recipient: ${props.proof.recipient}`,
@@ -54,7 +54,10 @@ async function copyRecord() {
     <h2 class="title">Payment verified</h2>
     <p class="badge">VERIFIED</p>
     <p class="message">
-      This is an observation record of what PROVIA saw on the Nimiq blockchain at verification time. It is not a cryptographic certificate.
+      PROVIA verified this payment using independently observed blockchain data.
+    </p>
+    <p class="disclaimer">
+      This is an observation record of what PROVIA saw on the Nimiq blockchain. It is not a cryptographic certificate.
     </p>
     <p class="session">This record is for this session only. It is not stored permanently.</p>
 
@@ -137,9 +140,14 @@ async function copyRecord() {
 }
 
 .message,
+.disclaimer,
 .session {
   margin: 0 0 0.75rem;
   color: var(--muted);
+}
+
+.message {
+  color: var(--text);
 }
 
 .session {
@@ -169,11 +177,13 @@ dd {
   margin: 0;
   font-size: 1.05rem;
   overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .address,
 .hash {
   font-size: 0.92rem;
+  word-break: break-word;
 }
 
 .error {

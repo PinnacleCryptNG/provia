@@ -74,6 +74,7 @@ li {
   color: var(--muted);
   text-align: center;
   line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 li[data-status='done'] .dot {

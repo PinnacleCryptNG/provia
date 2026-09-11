@@ -1,7 +1,7 @@
-import { shortenNimiqAddress, shortenTransactionHash } from './address.ts'
 import { formatLunaAsNim } from './amount.ts'
 import { confirmationProgressLabel } from './format.ts'
 import type { PaymentIntent } from './intent.ts'
+import { nimiqNetworkLabel } from './network.ts'
 import type { VerificationResult } from './verify.ts'
 import type { VerificationFlowState } from './verification-flow.ts'
 
@@ -56,7 +56,7 @@ function hashLabel(hash: string | null): string {
     return 'Unavailable'
   }
 
-  return shortenTransactionHash(hash)
+  return hash
 }
 
 function recipientLabel(address: string | null): string {
@@ -64,7 +64,7 @@ function recipientLabel(address: string | null): string {
     return 'Unavailable'
   }
 
-  return shortenNimiqAddress(address)
+  return address
 }
 
 function progressFrom(result: VerificationResult): ConfirmationProgress | null {
@@ -82,19 +82,23 @@ function progressFrom(result: VerificationResult): ConfirmationProgress | null {
   }
 }
 
-function intentRows(intent: PaymentIntent): EvidenceRow[] {
+function evidenceRows(intent: PaymentIntent, result?: VerificationResult): EvidenceRow[] {
   return [
     {
-      label: 'Transaction',
-      value: hashLabel(intent.transactionHash),
-    },
-    {
       label: 'Amount',
-      value: `${intent.amountNim} NIM`,
+      value: result ? amountLabel(result.expectedAmountLuna) : `${intent.amountNim} NIM`,
     },
     {
       label: 'Recipient',
-      value: recipientLabel(intent.recipient),
+      value: recipientLabel(result?.expectedRecipient ?? intent.recipient),
+    },
+    {
+      label: 'Network',
+      value: nimiqNetworkLabel(intent.network),
+    },
+    {
+      label: 'Transaction',
+      value: hashLabel(result?.transactionHash ?? intent.transactionHash),
     },
   ]
 }
@@ -104,14 +108,14 @@ export function submittedView(intent: PaymentIntent): VerificationViewModel {
     kind: 'submitted',
     eyebrow: 'Submitted',
     title: 'Payment submitted',
-    message: 'The wallet accepted the transaction. PROVIA has not verified it yet.',
-    note: 'PROVIA will now observe the Nimiq blockchain independently.',
+    message: 'Nimiq Pay accepted the transaction. PROVIA has not verified it yet.',
+    note: 'PROVIA will now locate this payment on the Nimiq blockchain independently.',
     tone: 'neutral',
     showVerifiedLabel: false,
     canRetry: false,
     isChecking: false,
     progress: null,
-    rows: intentRows(intent),
+    rows: evidenceRows(intent),
   }
 }
 
@@ -120,23 +124,14 @@ export function observingView(intent: PaymentIntent): VerificationViewModel {
     kind: 'checking',
     eyebrow: 'Observing',
     title: 'Observing the blockchain',
-    message: 'PROVIA is looking up this transaction independently. A wallet confirmation is not verification.',
+    message: 'PROVIA is independently observing the Nimiq blockchain before declaring this payment verified.',
     note: null,
     tone: 'neutral',
     showVerifiedLabel: false,
     canRetry: false,
     isChecking: true,
     progress: null,
-    rows: [
-      {
-        label: 'Amount',
-        value: `${intent.amountNim} NIM`,
-      },
-      {
-        label: 'Recipient',
-        value: recipientLabel(intent.recipient),
-      },
-    ],
+    rows: evidenceRows(intent),
   }
 }
 
@@ -145,8 +140,8 @@ function waitingView(intent: PaymentIntent, result: VerificationResult): Verific
     kind: 'waiting',
     eyebrow: 'Observing',
     title: 'Waiting for confirmations',
-    message: 'PROVIA is waiting for enough blockchain confirmations before declaring this payment verified.',
-    note: 'Testnet verification usually takes about a minute.',
+    message: 'PROVIA is independently observing the Nimiq blockchain before declaring this payment verified. Enough blockchain confirmations are still required.',
+    note: 'Verification requires 60 confirmations.',
     tone: 'waiting',
     showVerifiedLabel: false,
     canRetry: true,
@@ -157,20 +152,7 @@ function waitingView(intent: PaymentIntent, result: VerificationResult): Verific
       label: confirmationProgressLabel(0, result.confirmationPolicy),
       percent: 0,
     },
-    rows: [
-      {
-        label: 'Transaction',
-        value: hashLabel(result.transactionHash ?? intent.transactionHash),
-      },
-      {
-        label: 'Amount',
-        value: amountLabel(result.expectedAmountLuna),
-      },
-      {
-        label: 'Recipient',
-        value: recipientLabel(result.expectedRecipient),
-      },
-    ],
+    rows: evidenceRows(intent, result),
   }
 }
 
@@ -186,20 +168,7 @@ function notFoundView(intent: PaymentIntent, result: VerificationResult): Verifi
     canRetry: true,
     isChecking: false,
     progress: null,
-    rows: [
-      {
-        label: 'Transaction',
-        value: hashLabel(result.transactionHash ?? intent.transactionHash),
-      },
-      {
-        label: 'Amount',
-        value: amountLabel(result.expectedAmountLuna),
-      },
-      {
-        label: 'Recipient',
-        value: recipientLabel(result.expectedRecipient),
-      },
-    ],
+    rows: evidenceRows(intent, result),
   }
 }
 
@@ -219,20 +188,7 @@ function unresolvedEvidenceView(intent: PaymentIntent, result: VerificationResul
     canRetry: true,
     isChecking: false,
     progress: null,
-    rows: [
-      {
-        label: 'Transaction',
-        value: hashLabel(result.transactionHash ?? intent.transactionHash),
-      },
-      {
-        label: 'Amount',
-        value: amountLabel(result.expectedAmountLuna),
-      },
-      {
-        label: 'Recipient',
-        value: recipientLabel(result.expectedRecipient),
-      },
-    ],
+    rows: evidenceRows(intent, result),
   }
 }
 
@@ -248,13 +204,13 @@ function unresolvedView(intent: PaymentIntent, result: VerificationResult): Veri
   return unresolvedEvidenceView(intent, result)
 }
 
-function verifiedView(result: VerificationResult): VerificationViewModel {
+function verifiedView(intent: PaymentIntent, result: VerificationResult): VerificationViewModel {
   return {
     kind: 'verified',
     eyebrow: 'Verdict',
     title: 'Payment verified',
-    message: 'Recipient matched, amount matched, execution succeeded, and the 60-confirmation requirement was satisfied.',
-    note: 'Verified against independent Nimiq blockchain evidence.',
+    message: 'PROVIA verified this payment using independently observed blockchain data.',
+    note: 'This is an observation record of what PROVIA saw on the Nimiq blockchain. It is not a cryptographic certificate.',
     tone: 'positive',
     showVerifiedLabel: true,
     canRetry: false,
@@ -270,34 +226,44 @@ function verifiedView(result: VerificationResult): VerificationViewModel {
         value: recipientLabel(result.observedRecipient),
       },
       {
-        label: 'Transaction',
-        value: hashLabel(result.transactionHash),
+        label: 'Network',
+        value: nimiqNetworkLabel(intent.network),
       },
       {
-        label: 'Confirmations',
-        value: result.confirmations === null ? 'Unavailable' : confirmationProgressLabel(result.confirmations, result.confirmationPolicy),
+        label: 'Transaction',
+        value: result.transactionHash ?? 'Unavailable',
       },
       {
         label: 'Block',
         value: result.observedBlockNumber === null ? 'Unavailable' : String(result.observedBlockNumber),
       },
+      {
+        label: 'Confirmations',
+        value: result.confirmations === null ? 'Unavailable' : confirmationProgressLabel(result.confirmations, result.confirmationPolicy),
+      },
     ],
   }
 }
 
+const NOT_VERIFIED_MESSAGE = 'The observed transaction does not satisfy this payment request.'
+
 function mismatchView(intent: PaymentIntent, result: VerificationResult): VerificationViewModel {
+  const base = {
+    eyebrow: 'Verdict',
+    title: 'Payment not verified',
+    message: NOT_VERIFIED_MESSAGE,
+    tone: 'mismatch' as const,
+    showVerifiedLabel: false,
+    canRetry: false,
+    isChecking: false,
+    progress: null,
+  }
+
   if (result.outcome === 'UNDERPAID') {
     return {
+      ...base,
       kind: 'underpaid',
-      eyebrow: 'Doesn’t match',
-      title: "Payment doesn't match",
-      message: 'The amount observed on chain is less than the requested amount.',
-      note: null,
-      tone: 'mismatch',
-      showVerifiedLabel: false,
-      canRetry: false,
-      isChecking: false,
-      progress: null,
+      note: 'The amount observed on chain is less than the requested amount.',
       rows: [
         {
           label: 'Expected',
@@ -317,16 +283,9 @@ function mismatchView(intent: PaymentIntent, result: VerificationResult): Verifi
 
   if (result.reason === 'OVERPAID') {
     return {
+      ...base,
       kind: 'overpaid',
-      eyebrow: 'Doesn’t match',
-      title: "Payment doesn't match",
-      message: 'The amount observed on chain is greater than the requested amount.',
-      note: null,
-      tone: 'mismatch',
-      showVerifiedLabel: false,
-      canRetry: false,
-      isChecking: false,
-      progress: null,
+      note: 'The amount observed on chain is greater than the requested amount.',
       rows: [
         {
           label: 'Expected',
@@ -346,16 +305,9 @@ function mismatchView(intent: PaymentIntent, result: VerificationResult): Verifi
 
   if (result.reason === 'WRONG_RECIPIENT') {
     return {
+      ...base,
       kind: 'wrong_recipient',
-      eyebrow: 'Doesn’t match',
-      title: "Payment doesn't match",
-      message: 'The transaction was sent to a different address than the payment request.',
-      note: null,
-      tone: 'mismatch',
-      showVerifiedLabel: false,
-      canRetry: false,
-      isChecking: false,
-      progress: null,
+      note: 'The transaction was sent to a different address than the payment request.',
       rows: [
         {
           label: 'Expected recipient',
@@ -373,24 +325,13 @@ function mismatchView(intent: PaymentIntent, result: VerificationResult): Verifi
     }
   }
 
-  const message = result.reason === 'WRONG_NETWORK'
-    ? 'The transaction was found on a different Nimiq network than the payment request.'
-    : result.reason === 'WRONG_ASSET'
-      ? 'The transaction is not a NIM payment.'
-      : 'The transaction is not the intended NIM payment.'
-
   return {
+    ...base,
     kind: 'mismatch',
-    eyebrow: 'Doesn’t match',
-    title: "Payment doesn't match",
-    message,
-    note: null,
-    tone: 'mismatch',
-    showVerifiedLabel: false,
-    canRetry: false,
-    isChecking: false,
-    progress: null,
-    rows: intentRows(intent),
+    note: result.reason === 'WRONG_NETWORK'
+      ? 'The transaction was found on a different Nimiq network than the payment request.'
+      : null,
+    rows: evidenceRows(intent, result),
   }
 }
 
@@ -425,7 +366,7 @@ function failedView(result: VerificationResult): VerificationViewModel {
 
 export function resultView(intent: PaymentIntent, result: VerificationResult): VerificationViewModel {
   if (result.outcome === 'VERIFIED') {
-    return verifiedView(result)
+    return verifiedView(intent, result)
   }
 
   if (result.outcome === 'FAILED') {

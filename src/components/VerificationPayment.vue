@@ -15,12 +15,18 @@ const emit = defineEmits<{
 const view = computed(() => toVerificationView(props.state))
 const checkingLabel = computed(() => {
   if (view.value.kind === 'waiting') {
-    return 'Watching confirmations'
+    return 'Waiting for confirmations'
   }
   if (view.value.kind === 'unresolved' && view.value.title === 'Transaction not found yet') {
-    return 'Looking up the transaction'
+    return 'Locating the transaction'
   }
-  return 'Looking up independent blockchain evidence'
+  return 'Observing the Nimiq blockchain'
+})
+const showNotVerifiedLabel = computed(() => {
+  return view.value.kind === 'underpaid'
+    || view.value.kind === 'overpaid'
+    || view.value.kind === 'wrong_recipient'
+    || view.value.kind === 'mismatch'
 })
 </script>
 
@@ -28,6 +34,8 @@ const checkingLabel = computed(() => {
   <section class="receipt" :data-kind="view.kind">
     <p class="eyebrow">{{ view.eyebrow }}</p>
     <h2 :class="['title', view.tone]">{{ view.title }}</h2>
+    <p v-if="view.showVerifiedLabel" class="badge">VERIFIED</p>
+    <p v-else-if="showNotVerifiedLabel" class="badge mismatch">NOT VERIFIED</p>
     <p class="message">{{ view.message }}</p>
     <p v-if="view.note" class="note">{{ view.note }}</p>
 
@@ -76,12 +84,16 @@ const checkingLabel = computed(() => {
   background: var(--record);
 }
 
-.receipt[data-kind='waiting'] {
+.receipt[data-kind='waiting'],
+.receipt[data-kind='checking'] {
   border-color: rgb(224 180 79 / 45%);
 }
 
 .receipt[data-kind='verified'] {
-  border-color: rgb(62 207 159 / 45%);
+  background:
+    linear-gradient(180deg, rgb(62 207 159 / 10%), transparent 38%),
+    var(--record);
+  border-color: rgb(62 207 159 / 40%);
 }
 
 .receipt[data-kind='failed'] {
@@ -128,6 +140,23 @@ const checkingLabel = computed(() => {
 
 .title.neutral {
   color: var(--text);
+}
+
+.badge {
+  display: inline-block;
+  margin: 0 0 0.85rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgb(62 207 159 / 16%);
+  color: var(--verified);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.badge.mismatch {
+  background: rgb(224 154 74 / 16%);
+  color: var(--mismatch);
 }
 
 .message,
@@ -213,6 +242,7 @@ dd {
   margin: 0;
   font-size: 1.05rem;
   overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .verified-mark {

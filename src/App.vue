@@ -5,6 +5,7 @@ import CreatePayment from './components/CreatePayment.vue'
 import JourneySteps from './components/JourneySteps.vue'
 import ProofReceipt from './components/ProofReceipt.vue'
 import ReviewPayment from './components/ReviewPayment.vue'
+import SendDiagnostic from './components/SendDiagnostic.vue'
 import VerificationPayment from './components/VerificationPayment.vue'
 import { isIntentId, isProofId } from './lib/ids'
 import {
@@ -19,8 +20,6 @@ import {
 import {
   initializeNimiqProvider,
   isUserRejection,
-  NIMIQ_PAY_SEND_METHOD,
-  proviaIntentPaymentData,
   sendBasicNimPayment,
   toProviderConnectionError,
   toUserFacingError,
@@ -64,12 +63,7 @@ const proofError = ref<string | null>(null)
 const sharedProofMissing = ref(false)
 const createFormKey = ref(0)
 const sendDiagnostic = ref<PaymentSendDiagnostic | null>(null)
-
-const paymentBindingData = computed(() => {
-  return intent.value && isIntentId(intent.value.id)
-    ? proviaIntentPaymentData(intent.value.id)
-    : null
-})
+const showSendDiagnostic = import.meta.env.DEV
 
 let provider: NimiqProvider | null = null
 let observationRun = 0
@@ -233,7 +227,7 @@ async function runObservation() {
 
 async function confirmPayment() {
   if (!intent.value || !isIntentId(intent.value.id)) {
-    submitError.value = 'This payment has no server-owned request ID.'
+    submitError.value = 'This payment request is incomplete. Go back and create it again.'
     return
   }
 
@@ -356,8 +350,6 @@ function restart() {
         :intent="intent"
         :is-submitting="isSubmitting"
         :error-message="submitError"
-        :binding-method="NIMIQ_PAY_SEND_METHOD"
-        :binding-data="paymentBindingData"
         @back="backToCreate"
         @confirm="confirmPayment"
       />
@@ -367,35 +359,10 @@ function restart() {
         @retry="retryVerification"
         @restart="restart"
       />
-      <section
-        v-if="sendDiagnostic && (screen === 'review' || screen === 'verify')"
-        class="panel diagnostic"
-      >
-        <h2>On-chain payment binding</h2>
-        <p class="hint">Nimiq Pay attaches this identifier as transaction data. PROVIA verifies it independently against the blockchain.</p>
-        <dl>
-          <div>
-            <dt>Intent ID</dt>
-            <dd class="mono">{{ sendDiagnostic.intentId }}</dd>
-          </div>
-          <div>
-            <dt>Method</dt>
-            <dd class="mono">{{ sendDiagnostic.method }}</dd>
-          </div>
-          <div>
-            <dt>Data supplied</dt>
-            <dd class="mono">{{ sendDiagnostic.data }}</dd>
-          </div>
-          <div>
-            <dt>Returned value</dt>
-            <dd class="mono">{{ sendDiagnostic.returnedValue }}</dd>
-          </div>
-          <div>
-            <dt>Transaction hash used for verify</dt>
-            <dd class="mono">{{ sendDiagnostic.transactionHash }}</dd>
-          </div>
-        </dl>
-      </section>
+      <SendDiagnostic
+        v-if="showSendDiagnostic && sendDiagnostic && (screen === 'review' || screen === 'verify')"
+        :diagnostic="sendDiagnostic"
+      />
       <p v-if="proofError && screen === 'verify'" class="error">{{ proofError }}</p>
     </template>
   </main>
@@ -404,8 +371,10 @@ function restart() {
 <style scoped>
 .app {
   max-width: 26.5rem;
+  width: 100%;
   margin: 0 auto;
   padding: 1.15rem 1rem 2.5rem;
+  overflow-wrap: anywhere;
 }
 
 header {
@@ -505,45 +474,6 @@ h1 {
   border-radius: 0.85rem;
   border: 1px solid rgb(224 180 79 / 35%);
   background: rgb(224 180 79 / 10%);
-}
-
-.diagnostic {
-  margin-top: 1rem;
-  border-color: rgb(224 180 79 / 45%);
-}
-
-.diagnostic .hint {
-  margin: 0 0 0.85rem;
-  color: var(--muted);
-  font-size: 0.92rem;
-}
-
-.diagnostic dl {
-  margin: 0;
-}
-
-.diagnostic dl div {
-  padding: 0.7rem 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.diagnostic dt {
-  margin: 0 0 0.25rem;
-  font-size: 0.75rem;
-  font-weight: 650;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.diagnostic dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.88rem;
 }
 
 .error {

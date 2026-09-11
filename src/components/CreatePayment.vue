@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 
 import type { FieldErrors } from '../lib/intent'
+import { DEFAULT_NIMIQ_NETWORK, nimiqNetworkLabel } from '../lib/network'
 
 defineProps<{
   errors: FieldErrors
@@ -29,7 +30,7 @@ function submit() {
 <template>
   <form class="panel" @submit.prevent="submit">
     <h2>Create payment</h2>
-    <p class="hint">Enter the NIM payment to verify. Nothing is sent until you confirm in Nimiq Pay.</p>
+    <p class="hint">Enter the NIM payment you want PROVIA to verify. Nothing is sent until you approve it in Nimiq Pay.</p>
 
     <label>
       Recipient
@@ -59,6 +60,11 @@ function submit() {
       >
     </label>
     <p v-if="errors.amount" class="error" role="alert">{{ errors.amount }}</p>
+
+    <p class="network">
+      <span>Network</span>
+      <strong>{{ nimiqNetworkLabel(DEFAULT_NIMIQ_NETWORK) }}</strong>
+    </p>
 
     <label>
       Purpose
@@ -115,6 +121,7 @@ input {
   padding: 0.625rem 0.75rem;
   background: var(--ink);
   color: var(--text);
+  overflow-wrap: anywhere;
 }
 
 input::placeholder {
@@ -123,6 +130,26 @@ input::placeholder {
 
 input[aria-invalid='true'] {
   border-color: var(--danger);
+}
+
+.network {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.network strong {
+  font-size: 1rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
 }
 
 .error {

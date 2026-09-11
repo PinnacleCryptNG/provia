@@ -31,6 +31,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100svh;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at top, #17304a 0%, transparent 42%),
     var(--navy);
@@ -38,6 +39,7 @@ body {
 
 #app {
   min-height: 100svh;
+  overflow-x: hidden;
 }
 
 button,
@@ -61,6 +63,7 @@ button.secondary {
   border-radius: 0.7rem;
   padding: 0.625rem 0.875rem;
   font-weight: 650;
+  cursor: pointer;
 }
 
 button.primary {
@@ -75,6 +78,15 @@ button.secondary {
   border: 1px solid var(--line);
 }
 
+button.primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+button.secondary:hover:not(:disabled) {
+  background: rgb(232 238 246 / 6%);
+}
+
 button:disabled {
   opacity: 0.55;
+  cursor: not-allowed;
 }

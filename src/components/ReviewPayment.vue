@@ -6,8 +6,6 @@ defineProps<{
   intent: PaymentIntent
   isSubmitting: boolean
   errorMessage: string | null
-  bindingMethod: string
-  bindingData: string | null
 }>()
 
 const emit = defineEmits<{
@@ -18,8 +16,8 @@ const emit = defineEmits<{
 
 <template>
   <section class="panel">
-    <h2>Review payment</h2>
-    <p class="hint">Check every detail before Nimiq Pay asks you to approve. This is the last chance to catch a mistake.</p>
+    <h2>Review your payment</h2>
+    <p class="hint">You are about to approve this payment in Nimiq Pay.</p>
 
     <dl>
       <div>
@@ -41,13 +39,13 @@ const emit = defineEmits<{
     </dl>
 
     <p class="notice">
-      Wallet submission is not verification. PROVIA verifies the payment independently after it is submitted. Verification requires 60 blockchain confirmations.
+      PROVIA will independently verify this payment on the Nimiq blockchain after it is submitted.
+      Verification requires 60 confirmations.
     </p>
 
-    <p class="notice test">
-      Nimiq Pay will attach on-chain data
-      <span class="mono">{{ bindingData ?? 'PROVIA:&lt;intentId&gt;' }}</span>
-      via {{ bindingMethod }}. PROVIA verifies that exact binding independently. An HTLC payout without this identifier is not accepted.
+    <p class="notice binding">
+      <strong>On-chain payment binding.</strong>
+      PROVIA attaches a unique payment identifier to the transaction. The identifier is independently checked against the payment request on the Nimiq blockchain.
     </p>
 
     <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
@@ -104,6 +102,7 @@ dd {
   margin: 0;
   font-size: 1.08rem;
   overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .address {
@@ -120,15 +119,17 @@ dd {
   font-size: 0.92rem;
 }
 
-.notice.test {
+.notice.binding {
   background: rgb(61 134 196 / 12%);
 }
 
-.mono {
-  display: inline-block;
-  margin-top: 0.2rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  overflow-wrap: anywhere;
+.notice.binding strong {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .error {
