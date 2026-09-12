@@ -13,7 +13,14 @@ const emit = defineEmits<{
 <template>
   <header class="top">
     <div class="brand">
-      <span class="mark" aria-hidden="true" />
+      <img
+        class="mark"
+        src="/provia-icon.png"
+        alt=""
+        width="32"
+        height="32"
+        decoding="async"
+      />
       <p class="name">PROVIA</p>
     </div>
     <button
@@ -49,19 +56,8 @@ const emit = defineEmits<{
   width: 2rem;
   height: 2rem;
   flex: 0 0 auto;
-  border-radius: 0.7rem;
-  background: linear-gradient(180deg, #1aa8ea, var(--primary));
-}
-
-.mark::after {
-  content: '';
   display: block;
-  width: 0.8rem;
-  height: 0.4rem;
-  margin: 0.68rem auto 0;
-  border-left: 2px solid #fff;
-  border-bottom: 2px solid #fff;
-  transform: rotate(-45deg);
+  object-fit: contain;
 }
 
 .name {
