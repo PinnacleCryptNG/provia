@@ -75,15 +75,34 @@ describe('production UI copy', () => {
     assert.doesNotMatch(source, /type="text"\s+name="purpose"/)
   })
 
-  it('keeps the homepage to a Send NIM prompt', () => {
+  it('explains PROVIA on the homepage without changing the Send NIM entry point', () => {
     const source = read('src/components/HomeLanding.vue')
-    assert.match(source, /Independent payment verification/)
-    assert.match(source, /Send NIM in Nimiq Pay/)
+    const app = read('src/App.vue')
+    assert.match(source, /Send with confidence\. Verify with PROVIA\./)
+    assert.match(source, /Try PROVIA/)
+    assert.match(source, /\$emit\('start'\)/)
+    assert.match(source, /Built for Nimiq\. Currently on Testnet\./)
     assert.match(source, /Nimiq Testnet/)
-    assert.match(source, />[\s]*Send NIM[\s]*</)
+    assert.match(source, /A successful transaction can still be the wrong transaction/)
+    assert.match(source, /One mistake can cost everything/)
+    assert.match(source, /Meet PROVIA/)
+    assert.match(source, /How does PROVIA work\?/)
+    assert.match(source, /Confirm in Nimiq Pay/)
+    assert.match(source, /Payment verified/)
+    assert.match(source, /Payment not verified/)
+    assert.match(source, /Before you send NIM, verify it/)
+    assert.match(source, /\/examples\/wrong-network.jpg/)
+    assert.match(source, /\/examples\/wrong-address.jpg/)
+    assert.match(source, /\/examples\/address-poisoning.jpg/)
+    assert.match(app, /max-width: 26.5rem/)
     assert.doesNotMatch(source, /Request a payment/)
-    assert.doesNotMatch(source, /60 confirmations/)
-    assert.doesNotMatch(source, /intent/i)
+    assert.doesNotMatch(source, /detects poisoned|poisoning detection|burn-address detection/i)
+    assert.match(source, /PROVIA does not\s+detect poisoned addresses or burn addresses/)
+    assert.doesNotMatch(source, /cryptographic certificate/)
+    assert.match(source, /doesn't replace your wallet/)
+    assert.doesNotMatch(source, /PROVIA is a wallet/i)
+    assert.match(app, /<HomeLanding/)
+    assert.match(app, /@start="screen = 'create'"/)
   })
 
   it('gates the send diagnostic panel behind development mode', () => {
@@ -96,10 +115,13 @@ describe('production UI copy', () => {
 })
 
 describe('send-an-asset primary flow', () => {
-  it('shows Send NIM as the homepage primary action', () => {
+  it('starts the Send NIM flow from the homepage Try PROVIA action', () => {
     const home = read('src/components/HomeLanding.vue')
-    assert.match(home, /Send NIM/)
+    const create = read('src/components/CreatePayment.vue')
+    assert.match(home, /Try PROVIA/)
+    assert.match(home, /\$emit\('start'\)/)
     assert.doesNotMatch(home, /Request a payment/)
+    assert.match(create, /<h2>Send NIM<\/h2>/)
   })
 
   it('removes Request a payment wording from the primary flow', () => {

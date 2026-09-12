@@ -63,6 +63,9 @@ function contentTypeFor(filePath: string): string {
       return 'image/x-icon'
     case '.png':
       return 'image/png'
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg'
     case '.woff2':
       return 'font/woff2'
     default:

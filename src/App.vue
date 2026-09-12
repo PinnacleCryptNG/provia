@@ -378,7 +378,10 @@ function restart() {
 </script>
 
 <template>
-  <main class="app">
+  <main
+    class="app"
+    :class="{ 'is-home': showPaymentFlow && screen === 'home' }"
+  >
     <AppHeader
       :is-connecting="isConnectingWallet"
       :is-connected="isProviderReady"
@@ -459,6 +462,12 @@ function restart() {
     calc(1.6rem + env(safe-area-inset-bottom, 0px))
     max(1rem, env(safe-area-inset-left, 0px));
   overflow-wrap: anywhere;
+}
+
+@media (min-width: 45rem) {
+  .app.is-home {
+    max-width: 42rem;
+  }
 }
 
 .error,
