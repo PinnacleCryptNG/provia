@@ -464,10 +464,27 @@ function restart() {
   overflow-wrap: anywhere;
 }
 
-@media (min-width: 45rem) {
-  .app.is-home {
-    max-width: 42rem;
-  }
+.app.is-home {
+  max-width: none;
+  padding:
+    0.15rem
+    0
+    calc(1.4rem + env(safe-area-inset-bottom, 0px));
+}
+
+.app.is-home :deep(header.top) {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding:
+    0.85rem
+    max(1.1rem, env(safe-area-inset-right, 0px))
+    0.35rem
+    max(1.1rem, env(safe-area-inset-left, 0px));
+}
+
+.app.is-home .connect-error {
+  width: min(72rem, calc(100% - 2.2rem));
+  margin-inline: auto;
 }
 
 .error,

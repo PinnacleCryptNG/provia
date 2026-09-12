@@ -78,7 +78,7 @@ describe('production UI copy', () => {
   it('explains PROVIA on the homepage without changing the Send NIM entry point', () => {
     const source = read('src/components/HomeLanding.vue')
     const app = read('src/App.vue')
-    assert.match(source, /Send with confidence\. Verify with PROVIA\./)
+    assert.match(source, /Send with confidence\.\s*(<br\s*\/?>)?\s*Verify with PROVIA\./)
     assert.match(source, /Try PROVIA/)
     assert.match(source, /\$emit\('start'\)/)
     assert.match(source, /Built for Nimiq\. Currently on Testnet\./)
@@ -95,6 +95,8 @@ describe('production UI copy', () => {
     assert.match(source, /\/examples\/wrong-address.jpg/)
     assert.match(source, /\/examples\/address-poisoning.jpg/)
     assert.match(app, /max-width: 26.5rem/)
+    assert.match(app, /\.app\.is-home/)
+    assert.match(app, /max-width: none/)
     assert.doesNotMatch(source, /Request a payment/)
     assert.doesNotMatch(source, /detects poisoned|poisoning detection|burn-address detection/i)
     assert.match(source, /PROVIA does not\s+detect poisoned addresses or burn addresses/)
