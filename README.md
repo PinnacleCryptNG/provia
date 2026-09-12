@@ -23,27 +23,64 @@ Mini App  →  PROVIA server  →  Nimiq RPC
 
 ## Judged demo (required)
 
-The reliable Cycle 2 judged demo uses **one long-lived local Node process**, not a serverless deployment.
+The judged demo must keep **one long-lived Node process** for `/api/intents`, `/api/preflight`, `/api/verify`, and `/api/proofs`. Intents, proof records, and replay protection are in-memory on that process.
 
-Intents, proof records, and replay protection are stored in memory on that process. That is enough for a LAN demo. It is **not** durable across Vercel serverless isolates. Separate function instances can lose intent state. Do not use a Vercel URL as the judged demo.
+**Do not use a Vercel URL as the judged demo.** `vercel.json` + `api/index.ts` are a serverless adapter. Separate isolates do not share Maps, so a payment can lose its intent between create and verify.
 
-1. On this machine:
+Nimiq Pay should load a **public HTTPS** Mini App URL. The smallest reliable way is: run PROVIA locally, then put a Cloudflare Tunnel in front of that one process.
 
-   ```bash
-   npm install
-   npm run dev
-   ```
+### Start command
 
-2. Leave that process running. It starts:
+```bash
+npm install
+npm run build
+npm start
+```
 
-   - Vite Mini App on port `43123` (LAN-reachable)
-   - PROVIA verification server on port `43124`
+Leave `npm start` running. In a second terminal, expose it:
 
-3. Vite proxies `/api` to `http://127.0.0.1:43124`, so the Mini App and API share the same long-lived server.
+```bash
+cloudflared tunnel --url http://127.0.0.1:43124
+```
 
-4. In Nimiq Pay (Testnet), open the Vite **Network URL**, for example `http://192.168.1.42:43123`. Do not use `localhost` on the phone.
+Open the printed `https://….trycloudflare.com` URL in **Nimiq Pay → Testnet → Mini Apps**.
 
-Keep that Node process alive for the whole demo. Restarting it clears in-memory intents and proofs.
+`npm start` is one Node process. It serves the Vite production build from `dist/` and every `/api/*` route from the same listener, so in-memory state survives the whole session.
+
+Keep that process alive for the whole demo. Restarting it clears intents and proofs. Restarting the tunnel changes the public URL.
+
+### Required environment variables
+
+None required for Testnet.
+
+| Variable | Default | When to set |
+|---|---|---|
+| none | — | Testnet demo works with defaults |
+| `NIMIQ_RPC_URL` | `https://rpc.testnet.nimiqwatch.com` | Only to point observation at a different Testnet RPC. Do not set this to Mainnet for the judged demo. |
+| `PORT` or `PROVIA_SERVER_PORT` | `43124` | Only if the local port is taken |
+| `PROVIA_SERVER_HOST` | `127.0.0.1` | Leave as localhost when using a tunnel |
+
+### Ports
+
+- **43124** — judged `npm start` Mini App + API (tunnel this)
+- **43123** — Vite dev Mini App (`npm run dev` only)
+- **43124** — API during `npm run dev` (Vite proxies `/api` here)
+
+### Alternative: local `npm run dev` + tunnel
+
+If you skip the production build:
+
+```bash
+npm run dev
+cloudflared tunnel --url http://127.0.0.1:43123
+```
+
+That starts Vite on `43123` and the API on `43124`. Tunnel **43123** so `/api` stays proxied to the same API process. This is two child processes; memory still lives in the one API process.
+
+### Not judged: Vercel
+
+Vercel can host the static Mini App, but each serverless isolate has its own memory. That is not a valid judged-demo deployment.
+
 
 ## Requirements
 
@@ -67,7 +104,7 @@ Development has two processes, started together by `npm run dev`:
 npm run dev
 ```
 
-Vite proxies `/api` to `http://127.0.0.1:43124`. Open the **Network URL** from Nimiq Pay.
+Vite proxies `/api` to `http://127.0.0.1:43124`. For a LAN-only phone test you may enter the Vite Network URL in Nimiq Pay. For the judged recording, use `npm start` plus an HTTPS tunnel (above).
 
 ## API
 
@@ -83,11 +120,12 @@ Intents and proofs are in-memory for this prototype. Restarting the server clear
 
 ## Load it in Nimiq Pay
 
-1. Open Nimiq Pay on Testnet.
-2. Enter the Vite Network URL in Mini Apps.
-3. Send NIM. PROVIA checks the recipient on the Send screen, then locks the payment details on the server before Review.
-4. Confirm in Nimiq Pay.
-5. PROVIA independently verifies the on-chain payment after 60 confirmations. If it is verified, it issues a verification record for this session.
+1. Start `npm start` (after `npm run build`) and a Cloudflare Tunnel to port `43124`.
+2. Open Nimiq Pay on Testnet.
+3. Enter the `https://….trycloudflare.com` tunnel URL in Mini Apps.
+4. Send NIM. PROVIA checks the recipient on the Send screen, then locks the payment details on the server before Review.
+5. Confirm in Nimiq Pay.
+6. PROVIA independently verifies the on-chain payment after 60 confirmations. If it is verified, it issues a verification record for this session.
 
 ## Tests
 
@@ -101,4 +139,4 @@ npm test
 npm run build
 ```
 
-Vercel can serve the Vite build plus `api/index.ts`. That adapter reuses `createProviaRequestListener()`, but each serverless isolate has its own memory. Local `npm run dev` is the judged demo path: Vite’s proxy to port `43124` uses one long-lived Node server.
+Vercel can serve the Vite build plus `api/index.ts`. That adapter reuses `createProviaRequestListener()`, but each serverless isolate has its own memory. Do not use it for the judged demo. `npm start` after `npm run build` is the judged path: one Node process serves `dist/` and `/api`.

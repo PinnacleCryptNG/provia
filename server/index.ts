@@ -1,5 +1,6 @@
 import http from 'node:http'
-import { resolve } from 'node:path'
+import fs from 'node:fs'
+import { extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isIntentId, isProofId } from '../src/lib/ids.ts'
 import {
@@ -32,6 +33,7 @@ export const DEFAULT_SERVER_PORT = 43124
 export const DEFAULT_SERVER_HOST = '127.0.0.1'
 
 const MAX_BODY_BYTES = 32 * 1024
+const DIST_DIR = fileURLToPath(new URL('../dist', import.meta.url))
 
 export type ProviaServerOptions = {
   observe?: ObserveTransaction
@@ -41,6 +43,86 @@ export type ProviaServerOptions = {
   reservations?: HashReservationStore
   host?: string
   port?: number
+  staticDir?: string
+}
+
+function contentTypeFor(filePath: string): string {
+  switch (extname(filePath).toLowerCase()) {
+    case '.html':
+      return 'text/html; charset=utf-8'
+    case '.js':
+    case '.mjs':
+      return 'text/javascript; charset=utf-8'
+    case '.css':
+      return 'text/css; charset=utf-8'
+    case '.svg':
+      return 'image/svg+xml'
+    case '.json':
+      return 'application/json; charset=utf-8'
+    case '.ico':
+      return 'image/x-icon'
+    case '.png':
+      return 'image/png'
+    case '.woff2':
+      return 'font/woff2'
+    default:
+      return 'application/octet-stream'
+  }
+}
+
+function safeStaticPath(root: string, pathname: string): string | null {
+  const relative = pathname.replace(/^\/+/, '')
+  const candidate = resolve(root, relative)
+  const rootWithSep = root.endsWith(sep) ? root : `${root}${sep}`
+  if (candidate !== root && !candidate.startsWith(rootWithSep)) {
+    return null
+  }
+  return candidate
+}
+
+function sendFile(res: http.ServerResponse, filePath: string, method: string): void {
+  const body = fs.readFileSync(filePath)
+  res.writeHead(200, {
+    'Content-Type': contentTypeFor(filePath),
+    'Cache-Control': extname(filePath) === '.html' ? 'no-store' : 'public, max-age=120',
+    'Access-Control-Allow-Origin': '*',
+  })
+  res.end(method === 'HEAD' ? undefined : body)
+}
+
+function tryServeStatic(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  pathname: string,
+  staticDir: string | undefined,
+): boolean {
+  if (!staticDir || (req.method !== 'GET' && req.method !== 'HEAD')) {
+    return false
+  }
+
+  const method = req.method ?? 'GET'
+  const requested = pathname === '/' ? '/index.html' : pathname
+  const filePath = safeStaticPath(staticDir, requested)
+  if (filePath && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    sendFile(res, filePath, method)
+    return true
+  }
+
+  const looksLikeAsset = /\.[a-zA-Z0-9]+$/.test(pathname)
+  const indexPath = join(staticDir, 'index.html')
+  if (!looksLikeAsset && fs.existsSync(indexPath)) {
+    sendFile(res, indexPath, method)
+    return true
+  }
+
+  return false
+}
+
+function resolvedStaticDir(explicit?: string): string | undefined {
+  if (explicit) {
+    return explicit
+  }
+  return fs.existsSync(join(DIST_DIR, 'index.html')) ? DIST_DIR : undefined
 }
 
 function json(res: http.ServerResponse, status: number, body: unknown): void {
@@ -107,8 +189,9 @@ export function createProviaRequestListener(options: {
   intents: IntentStore
   proofs: ProofStore
   reservations: HashReservationStore
+  staticDir?: string
 }): http.RequestListener {
-  const { observe, lookupAccount, intents, proofs, reservations } = options
+  const { observe, lookupAccount, intents, proofs, reservations, staticDir } = options
 
   return async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://provia.local')
@@ -310,6 +393,10 @@ export function createProviaRequestListener(options: {
       return
     }
 
+    if (tryServeStatic(req, res, pathname, staticDir)) {
+      return
+    }
+
     json(res, 404, { error: 'Not found.' })
   }
 }
@@ -326,16 +413,19 @@ export function createProviaServer(options: ProviaServerOptions = {}): http.Serv
     intents,
     proofs,
     reservations,
+    staticDir: options.staticDir,
   }))
 }
 
 export function startProviaServer(options: ProviaServerOptions = {}): http.Server {
   const host = options.host ?? process.env.PROVIA_SERVER_HOST ?? DEFAULT_SERVER_HOST
-  const port = options.port ?? Number(process.env.PROVIA_SERVER_PORT ?? DEFAULT_SERVER_PORT)
-  const server = createProviaServer(options)
+  const port = options.port ?? Number(process.env.PORT ?? process.env.PROVIA_SERVER_PORT ?? DEFAULT_SERVER_PORT)
+  const staticDir = options.staticDir ?? resolvedStaticDir()
+  const server = createProviaServer({ ...options, staticDir })
 
   server.listen(port, host, () => {
-    console.log(`PROVIA verification server listening on http://${host}:${port}`)
+    const surfaces = staticDir ? 'Mini App + API' : 'API'
+    console.log(`PROVIA ${surfaces} listening on http://${host}:${port}`)
   })
 
   return server
