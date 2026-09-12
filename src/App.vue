@@ -21,6 +21,7 @@ import {
 } from './lib/intent'
 import {
   initializeNimiqProvider,
+  isUserRejection,
   listNimiqAccounts,
   sendBasicNimPayment,
   type PaymentSendDiagnostic,
@@ -116,21 +117,55 @@ async function bindProvider() {
   }
 }
 
-async function connectWallet() {
-  isConnectingWallet.value = true
-  initError.value = null
+let connectInFlight: Promise<boolean> | null = null
+
+async function connectWallet(): Promise<boolean> {
+  if (isProviderReady.value) {
+    return true
+  }
+  if (connectInFlight) {
+    return connectInFlight
+  }
+
+  connectInFlight = (async () => {
+    isConnectingWallet.value = true
+    initError.value = null
+
+    try {
+      await bindProvider()
+      return true
+    }
+    catch (error) {
+      provider = null
+      isProviderReady.value = false
+      accountLabel.value = null
+      if (!isUserRejection(error)) {
+        initError.value = CONNECT_WALLET_USER_ERROR
+      }
+      return false
+    }
+    finally {
+      isConnectingWallet.value = false
+    }
+  })()
 
   try {
-    await bindProvider()
-  }
-  catch {
-    provider = null
-    isProviderReady.value = false
-    accountLabel.value = null
-    initError.value = CONNECT_WALLET_USER_ERROR
+    return await connectInFlight
   }
   finally {
-    isConnectingWallet.value = false
+    connectInFlight = null
+  }
+}
+
+async function startSendFlow() {
+  if (isProviderReady.value) {
+    screen.value = 'create'
+    return
+  }
+
+  const connected = await connectWallet()
+  if (connected) {
+    screen.value = 'create'
   }
 }
 
@@ -410,7 +445,8 @@ function restart() {
     <template v-if="showPaymentFlow">
       <HomeLanding
         v-if="screen === 'home'"
-        @start="screen = 'create'"
+        :is-connecting="isConnectingWallet"
+        @start="startSendFlow"
       />
       <CreatePayment
         :key="createFormKey"

@@ -104,7 +104,11 @@ describe('production UI copy', () => {
     assert.match(source, /doesn't replace your wallet/)
     assert.doesNotMatch(source, /PROVIA is a wallet/i)
     assert.match(app, /<HomeLanding/)
-    assert.match(app, /@start="screen = 'create'"/)
+    assert.match(app, /@start="startSendFlow"/)
+    assert.match(app, /async function startSendFlow/)
+    assert.match(app, /const connected = await connectWallet\(\)/)
+    assert.match(app, /if \(connected\) \{\s*screen\.value = 'create'/)
+    assert.doesNotMatch(app.slice(app.indexOf('async function startSendFlow'), app.indexOf('onMounted(async')), /sendBasicNimPayment/)
   })
 
   it('gates the send diagnostic panel behind development mode', () => {
@@ -120,10 +124,33 @@ describe('send-an-asset primary flow', () => {
   it('starts the Send NIM flow from the homepage Try PROVIA action', () => {
     const home = read('src/components/HomeLanding.vue')
     const create = read('src/components/CreatePayment.vue')
+    const app = read('src/App.vue')
+    const startFn = app.slice(app.indexOf('async function startSendFlow'), app.indexOf('onMounted(async'))
     assert.match(home, /Try PROVIA/)
     assert.match(home, /\$emit\('start'\)/)
     assert.doesNotMatch(home, /Request a payment/)
     assert.match(create, /<h2>Send NIM<\/h2>/)
+    assert.match(startFn, /if \(isProviderReady\.value\) \{\s*screen\.value = 'create'/)
+    assert.match(startFn, /await connectWallet\(\)/)
+    assert.match(startFn, /screen\.value = 'create'/)
+    assert.doesNotMatch(startFn, /sendBasicNimPayment|checkPaymentDetails|createServerIntent/)
+  })
+
+  it('connects through the existing header wallet flow before Send NIM', () => {
+    const app = read('src/App.vue')
+    const home = read('src/components/HomeLanding.vue')
+    const connectFn = app.slice(app.indexOf('async function connectWallet'), app.indexOf('async function startSendFlow'))
+    const startFn = app.slice(app.indexOf('async function startSendFlow'), app.indexOf('onMounted(async'))
+    assert.match(app, /@connect="connectWallet"/)
+    assert.match(connectFn, /await bindProvider\(\)/)
+    assert.match(connectFn, /isUserRejection\(error\)/)
+    assert.match(connectFn, /CONNECT_WALLET_USER_ERROR/)
+    assert.match(startFn, /if \(isProviderReady\.value\)/)
+    assert.match(startFn, /const connected = await connectWallet\(\)/)
+    assert.match(startFn, /if \(connected\) \{\s*screen\.value = 'create'/)
+    assert.doesNotMatch(home, /initializeNimiqProvider|bindProvider/)
+    assert.doesNotMatch(connectFn, /sendBasicNimPayment/)
+    assert.doesNotMatch(startFn, /initError\.value = CONNECT_WALLET_USER_ERROR/)
   })
 
   it('removes Request a payment wording from the primary flow', () => {

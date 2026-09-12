@@ -1,4 +1,8 @@
 <script setup lang="ts">
+defineProps<{
+  isConnecting?: boolean
+}>()
+
 defineEmits<{
   start: []
 }>()
@@ -19,7 +23,7 @@ defineEmits<{
             approve it, then independently verifies what happened on-chain after you send it.
           </p>
           <div class="hero-actions">
-            <button type="button" class="primary cta" @click="$emit('start')">
+            <button type="button" class="primary cta" :disabled="isConnecting" @click="$emit('start')">
               Try PROVIA
             </button>
             <p class="support">Built for Nimiq. Currently on Testnet.</p>
@@ -250,7 +254,7 @@ defineEmits<{
           Know what you're approving.<br />
           Know what happened after you sent it.
         </p>
-        <button type="button" class="primary cta" @click="$emit('start')">
+        <button type="button" class="primary cta" :disabled="isConnecting" @click="$emit('start')">
           Try PROVIA
         </button>
         <p class="support">PROVIA is currently available on Nimiq Testnet.</p>
