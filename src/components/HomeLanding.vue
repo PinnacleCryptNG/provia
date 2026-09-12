@@ -275,6 +275,8 @@ defineEmits<{
 .stage-label,
 .result-kicker,
 .concept-kicker {
+  display: block;
+  width: 100%;
   margin: 0 0 0.7rem;
   color: var(--primary);
   font-size: 0.76rem;

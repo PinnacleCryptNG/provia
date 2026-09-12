@@ -473,12 +473,14 @@ function restart() {
 }
 
 .app.is-home :deep(header.top) {
+  width: 100%;
+  box-sizing: border-box;
   max-width: 72rem;
   margin: 0 auto;
   padding:
     0.85rem
     max(1.1rem, env(safe-area-inset-right, 0px))
-    0.35rem
+    0.65rem
     max(1.1rem, env(safe-area-inset-left, 0px));
 }
 
