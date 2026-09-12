@@ -289,6 +289,7 @@ describe('send-an-asset primary flow', () => {
     assert.match(verifying, /view\.canRetry/)
     assert.match(verifying, /Check again/)
     assert.match(verifying, /Back to send/)
+    assert.match(verifying, /v-if="!view\.showVerifiedLabel"/)
     assert.match(app, /@back="backToSend"/)
     assert.doesNotMatch(verifying, /finality|cryptographic proof|certificate|trustless/i)
   })

@@ -1,4 +1,5 @@
 import { normalizeNimiqAddress } from './address.ts'
+import { fetchWithTimeout } from './http.ts'
 import { rpcUrlForNetwork, type NimiqNetwork } from './network.ts'
 
 export const GET_ACCOUNT_BY_ADDRESS = 'getAccountByAddress'
@@ -88,7 +89,7 @@ export async function getNimAccountByAddress(
   options: AccountLookupOptions = {},
 ): Promise<AccountLookupResult> {
   const rpcUrl = options.rpcUrl ?? rpcUrlForNetwork(network)
-  const fetchFn = options.fetch ?? globalThis.fetch
+  const fetchFn = options.fetch ?? fetchWithTimeout
 
   let response: Response
   try {

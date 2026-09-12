@@ -1,4 +1,5 @@
 import { formatLunaAsNim } from './amount.ts'
+import { fetchWithTimeout } from './http.ts'
 import { isIntentId } from './ids.ts'
 import type { PaymentIntent } from './intent.ts'
 import { DEFAULT_NIMIQ_NETWORK } from './network.ts'
@@ -85,7 +86,7 @@ export async function createServerIntent(
   draft: { recipient: string, amountLuna: number, asset?: 'NIM', network?: PaymentIntent['network'] },
   options: VerificationServiceOptions = {},
 ): Promise<CreatedServerIntent> {
-  const fetchFn = options.fetch ?? globalThis.fetch
+  const fetchFn = options.fetch ?? fetchWithTimeout
   const intentsUrl = options.intentsUrl ?? INTENTS_API_PATH
 
   let response: Response
@@ -147,7 +148,7 @@ export async function fetchRecipientPreflight(
   recipient: string,
   options: VerificationServiceOptions = {},
 ): Promise<RecipientCheckApiResult> {
-  const fetchFn = options.fetch ?? globalThis.fetch
+  const fetchFn = options.fetch ?? fetchWithTimeout
   const preflightUrl = options.preflightUrl ?? PREFLIGHT_API_PATH
 
   let response: Response
@@ -219,7 +220,7 @@ export function paymentIntentFromServer(
 export function createProviaApiVerificationService(
   options: VerificationServiceOptions = {},
 ): PaymentVerificationService {
-  const fetchFn = options.fetch ?? globalThis.fetch
+  const fetchFn = options.fetch ?? fetchWithTimeout
   const verifyUrl = options.verifyUrl ?? VERIFY_API_PATH
 
   return {
@@ -266,7 +267,7 @@ export async function createServerProof(
   transactionHash: string,
   options: VerificationServiceOptions = {},
 ): Promise<ProofRecord> {
-  const fetchFn = options.fetch ?? globalThis.fetch
+  const fetchFn = options.fetch ?? fetchWithTimeout
   const proofsUrl = options.proofsUrl ?? PROOFS_API_PATH
 
   const response = await fetchFn(proofsUrl, {
@@ -290,7 +291,7 @@ export async function fetchServerProof(
   proofId: string,
   options: VerificationServiceOptions = {},
 ): Promise<ProofRecord | null> {
-  const fetchFn = options.fetch ?? globalThis.fetch
+  const fetchFn = options.fetch ?? fetchWithTimeout
   const response = await fetchFn(`${PROOFS_API_PATH}/${encodeURIComponent(proofId)}`)
   if (response.status === 404) {
     return null

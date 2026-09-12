@@ -21,7 +21,6 @@ const emit = defineEmits<{
       Try again
     </button>
     <button
-      v-if="kind === 'failed'"
       type="button"
       class="secondary"
       @click="emit('back')"

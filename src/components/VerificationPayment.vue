@@ -14,13 +14,6 @@ const emit = defineEmits<{
 }>()
 
 const view = computed(() => toVerificationView(props.state))
-const showNotVerified = computed(() => {
-  return view.value.kind === 'underpaid'
-    || view.value.kind === 'overpaid'
-    || view.value.kind === 'wrong_recipient'
-    || view.value.kind === 'mismatch'
-    || view.value.kind === 'failed'
-})
 const showStatus = computed(() => {
   return view.value.kind === 'submitted'
     || view.value.kind === 'checking'
@@ -89,7 +82,7 @@ const showStatus = computed(() => {
       Check again
     </button>
     <button
-      v-if="showNotVerified || view.canRetry"
+      v-if="!view.showVerifiedLabel"
       type="button"
       class="secondary"
       @click="emit('back')"
@@ -97,7 +90,7 @@ const showStatus = computed(() => {
       Back to send
     </button>
     <button
-      v-else-if="view.showVerifiedLabel"
+      v-else
       type="button"
       class="primary"
       @click="emit('restart')"

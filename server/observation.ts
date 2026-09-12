@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from '../src/lib/http.ts'
 import { getNimTransactionByHash, type NimObservationResult } from '../src/lib/observe.ts'
 
 /**
@@ -14,7 +15,7 @@ export function createNimiqRpcObserver(options: {
   fetch?: typeof globalThis.fetch
 } = {}): ObserveTransaction {
   const rpcUrl = options.rpcUrl ?? NIMIQ_RPC_URL
-  const fetchImpl = options.fetch ?? globalThis.fetch
+  const fetchImpl = options.fetch ?? fetchWithTimeout
 
   return (hash) => getNimTransactionByHash(hash, { rpcUrl, fetch: fetchImpl })
 }
